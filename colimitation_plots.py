@@ -1,10 +1,12 @@
+"""
+This module contains parameters and a few functions to standardize plotting 
+across figures.
+"""
+
+
 import numpy
-import math
-import pandas
-import sys
-#sys.path.append("/home/mmanhart/Tools")
-#import crm
-#import colimitation
+import matplotlib.lines as mlines
+import matplotlib.patches as mpatches
 
 
 # Set font sizes
@@ -15,19 +17,12 @@ legend_label_size = 8
 legend_label_size_small = 6
 
 
-# Set default gmax
-gmaxes = numpy.array([1])
-
-
-# Set default dilution factor
-dilution_factor = 100
-
-
-# Set colors for nutrients
-nutrient_colors = ["blue", "orange", "green", "red", "purple", "brown", "pink", "greenyellow", "olive", "cyan"]
-
-
 def SetrcParams(rcParams):
+     """
+     rcParams: Current state of rcParams from pyplot
+
+     return: New state of rcParams with font settings
+     """
 
      # Set fonts
      rcParams["font.family"] = "serif"
@@ -37,127 +32,89 @@ def SetrcParams(rcParams):
      return rcParams
 
 
-def GetMooreYields(num_nutrients, normalize=True, lim_nutrient=1):
+def CalcPointsLineSegment(xs, ys, num_segments):
+     """
+     xs: Pair of x coordinates
+     ys: Pair of y coordinates
+     num_segments: Number of segments to equally divide the whole line into
 
-     # Read data table from Moore et al. paper
-     data = pandas.read_csv("../Moore_etal_2013_NatureGeosci_data/Supplementary_Table_1.csv")
+     return: List of (num_segments - 1) equally-spaced (x, y) points
+     """
 
-     # List of pairs: elements and relative biomass yields
-     pair_list = []
+     # Unpack coordinates
+     x1, x2 = xs
+     y1, y2 = ys
 
-     # Iterate over rows in data table
-     for index, row in data.iterrows():
+     # Calculate slope
+     slope = (y2 - y1)/(x2 - x1)
 
-          # Skip elements with missing data for these entries (H and O)
-          if (not math.isnan(row["Phytoplankton quota (mol:mol C)"])) and (not math.isnan(row["Mean ocean concentration (umol/kg)"])):
+     # Calculate total distance along line segment
+     Dtotal = numpy.sqrt((x2 - x1)**2 + (y2 - y1)**2)
 
-               # Get relative yield (biomass per unit element)
-               Y = 1/row["Phytoplankton quota (mol:mol C)"]
+     # Calculate equally-spaced points along line segment
+     xpoints = [-Dtotal*(n/num_segments)/numpy.sqrt(1 + slope**2) + x1 for n in range(1, num_segments)]
+     ypoints = [slope*(x - x1) + y1 for x in xpoints]
 
-               # Get element concentration and convert to mol from umol
-               R = row["Mean ocean concentration (umol/kg)"]/1e6
+     # Combine x and y points into array of pairs
+     xypoints = numpy.array([xpoints, ypoints])
+     xypoints = xypoints.T
 
-               # Add data to list
-               pair_list.append((row["Element"], R*Y))
-
-     # Sort elements and ratios in order of increasing biomass
-     pair_list = sorted(pair_list, key=lambda x: x[1])
-
-     # Extract sorted lists of elements and yields separately; exclude Cd
-     elements = [pair[0] for pair in pair_list if pair[0] != "Cd"]
-     yields = numpy.array([pair[1] for pair in pair_list if pair[0] != "Cd"])
-
-     # Extract lowest yields and normalize the smallest to 1
-     yields = yields[:num_nutrients]
-     if normalize:
-          yields = yields/yields[0]
-
-     # Reorder yields so that a potentially different yield is the lowest
-     yields[0], yields[lim_nutrient] = yields[lim_nutrient], yields[0]
-
-     return yields
+     return xypoints
 
 
-def ReadSimulationData(run_name):
-
-     # Parameters
-     params = {}
-
-     # Read simulation data
-     with gzip.open(run_name + ".K-trajectories.gz", "rb") as myFile:
-
-          # Initialize trajectories data array
-          trajectories = []
-
-          # Read lines in file
-          for line in myFile:
-
-               # Convert binary to ASCII
-               line = line.decode("ascii")
-
-               # Skip blank lines
-               if line.isspace(): continue
-
-               # Check for parameter lines
-               if line.startswith("#"):
-
-                    # Extract growth rate model and yields
-                    if line.startswith("# Namespace"):
-                         params["growth_rate_model"] = line[line.find("growth_rate_model='") + len("growth_rate_model='"):line.find("', mean_mutation_effect")]
-
-                         position = line.find("yields=")
-                         line = line[position + len("yields="):].strip().strip(")").strip("'").split(",")
-                         params["Ys"] = numpy.array([float(x) for x in line])
-
-                    # Extract gmax
-                    elif line.startswith("# gmaxes"):
-                         line = line.strip().strip("# gmaxes").strip("[").strip("]").split()
-                         params["gmaxes"] = numpy.array([numpy.mean([float(x) for x in line])])
-
-                    # Extract initial biomass
-                    elif line.startswith("# N0s"):
-                         line = line.strip().strip("# N0s").strip("[").strip("]").split()
-                         params["N0s"] = numpy.array([sum(float(x) for x in line)])
-                    
-                    # Extract initial nutrient concentrations
-                    elif line.startswith("# R0s"):
-                         line = line.strip().strip("# R0s").strip("[").strip("]").split()
-                         params["R0s"] = numpy.array([float(x) for x in line])
-                         params["num_nutrients"] = len(params["R0s"])
-
-                    continue
-
-               # Split the line into the trajectory data
-               line = line.split()
-               trajectories.append([[float(K) for K in entry.split(",")] for entry in line])
-
-     # Convert trajectory data to numpy array (shape is replicates, time points, nutrients)
-     trajectories = numpy.array(trajectories)
+def add_arrow_to_line2D(axes, line, arrow_locs=[0.2, 0.4, 0.6, 0.8], arrowstyle='-|>', arrowsize=1, transform=None):
+     """
+     Copied verbatim from https://stackoverflow.com/questions/26911898/matplotlib-curve-with-arrow-ticks
      
-     # Average over replicates to get average trajectory
-     trajectory_average = numpy.average(trajectories, axis=0)
-
-     # Extract evolutionary time points (number of mutation events)
-     time_points_evo = numpy.array([t for t in range(len(trajectory_average))])
-
-     return trajectories, trajectory_average, time_points_evo, params
-
-
-def ReadMeffTrajectories(run_name):
-
-     time_points = []
-     Meff_trajectories = []
-
-     with open(run_name + ".Meff-trajectories") as myFile:
-          for line in myFile:
-               if line.isspace() or line.startswith("#"): 
-                    continue
-
-               time_points.append(int(line.split()[0]))
-               Meff_trajectories.append([float(x) for x in line.split()[1:]])
-
-     time_points = numpy.array(time_points)
-     Meff_trajectories = numpy.array(Meff_trajectories).T
-
-     return time_points, Meff_trajectories
-
+     Add arrows to a matplotlib.lines.Line2D at selected locations.
+     
+     Parameters:
+     -----------
+     axes: 
+     line: Line2D object as returned by plot command
+     arrow_locs: list of locations where to insert arrows, % of total length
+     arrowstyle: style of the arrow
+     arrowsize: size of the arrow
+     transform: a matplotlib transform instance, default to data coordinates
+     
+     Returns:
+     --------
+     arrows: list of arrows
+     """
+     if not isinstance(line, mlines.Line2D):
+          raise ValueError("expected a matplotlib.lines.Line2D object")
+     x, y = line.get_xdata(), line.get_ydata()
+     
+     arrow_kw = {
+        "arrowstyle": arrowstyle,
+        "mutation_scale": 10 * arrowsize,
+     }
+     
+     color = line.get_color()
+     use_multicolor_lines = isinstance(color, numpy.ndarray)
+     if use_multicolor_lines:
+          raise NotImplementedError("multicolor lines not supported")
+     else:
+          arrow_kw['color'] = color
+     
+     linewidth = line.get_linewidth()
+     if isinstance(linewidth, numpy.ndarray):
+          raise NotImplementedError("multiwidth lines not supported")
+     else:
+          arrow_kw['linewidth'] = linewidth
+     
+     if transform is None:
+          transform = axes.transData
+     
+     arrows = []
+     for loc in arrow_locs:
+          s = numpy.cumsum(numpy.sqrt(numpy.diff(x) ** 2 + numpy.diff(y) ** 2))
+          n = numpy.searchsorted(s, s[-1] * loc)
+          arrow_tail = (x[n], y[n])
+          arrow_head = (numpy.mean(x[n:n + 2]), numpy.mean(y[n:n + 2]))
+          p = mpatches.FancyArrowPatch(
+            arrow_tail, arrow_head, transform=transform,
+            **arrow_kw)
+          axes.add_patch(p)
+          arrows.append(p)
+     return arrows
