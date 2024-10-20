@@ -2,6 +2,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 import numpy as np
+import colimitation
 import scipy
 import numpy
 from matplotlib.lines import Line2D
@@ -22,16 +23,22 @@ plt.rcParams = colimitation_plots.SetrcParams(plt.rcParams)
     "font.size": 20})'''
 plt.rcParams['lines.linewidth'] = 2
 
-df = pd.read_excel("Data/Dataset_S3.xlsx", skiprows = 4)
+
+df = pd.read_excel("Dataset_S3.xlsx", skiprows = 11)
 df = df.iloc[:-2,]
 
-# convert to uM for plotting
-mmvaluesList = ['Nutrient 1 K common unit (mM)','Nutrient 2 K common unit (mM)','Nutrient 1 environment In situ conc (mM)',
-'Nutrient 1 conc low (mM)','Nutrient 1 conc hi (mM)','Nutrient 2 environment In situ conc (mM)','Nutrient 2 conc low (mM)','Nutrient 2 conc hi (mM)', 'Nutrient 1 range (mM)', 'Nutrient 2 range (mM)']
-for value in mmvaluesList:
-    df[value] = df[value]*1000
+# fill nas and convert to uM for plotting
+
 df['Nutrient 1 range (mM)'].fillna(0, inplace=True)
 df['Nutrient 2 range (mM)'].fillna(0, inplace=True)
+
+#convert to micromolar
+df['Nutrient 1 K common unit (mM)'] = df['Nutrient 1 K common unit (mM)']*1000
+df['Nutrient 2 K common unit (mM)'] = df['Nutrient 2 K common unit (mM)']*1000
+df['Nutrient 1 environment In situ conc (mM)'] = df['Nutrient 1 environment In situ conc (mM)']*1000
+df['Nutrient 2 environment In situ conc (mM)'] = df['Nutrient 2 environment In situ conc (mM)']*1000
+df['Nutrient 1 range (mM)'] = df['Nutrient 1 range (mM)']*1000
+df['Nutrient 2 range (mM)'] = df['Nutrient 2 range (mM)']*1000
 
 plt.rcParams.update({'font.size': 12})
 plt.rcParams['legend.fontsize'] = 9
@@ -46,8 +53,7 @@ axes = [ax0, ax1, ax2]
 
 # Stack on species and limiting nutrients
 combinecolslist = [['Limiting Nutrient 1', 'Limiting Nutrient 2'],['Nutrient 1 K common unit (mM)','Nutrient 2 K common unit (mM)'],['Nutrient 1 environment In situ conc (mM)','Nutrient 2 environment In situ conc (mM)'],
-['Nutrient 1 conc low (mM)','Nutrient 2 conc low (mM)'],['Nutrient 1 conc hi (mM)','Nutrient 2 conc hi (mM)'],
-['Autotroph','Autotroph'],['Eukaryote','Eukaryote'],['Habitat','Habitat'],['Nutrient 1 Li_liebig','Nutrient 2 Li_liebig'],
+['Nutrient 1 conc low (mM)','Nutrient 2 conc low (mM)'],['Nutrient 1 conc hi (mM)','Nutrient 2 conc hi (mM)'],['Habitat','Habitat'],['Nutrient 1 Li_liebig','Nutrient 2 Li_liebig'],
 ['Nutrient 1 Li_additive','Nutrient 2 Li_additive'],['Nutrient 1 Li_multiplicative','Nutrient 2 Li_multiplicative'],
 ['Nutrient 1 Li_pat','Nutrient 2 Li_pat'],['Nutrient 1 range (mM)','Nutrient 2 range (mM)']]
 colslist = []
@@ -56,7 +62,7 @@ for colList in combinecolslist:
     nutdf = pd.concat(cols, ignore_index=True)
     colslist.append(nutdf)
 df2 = pd.concat(colslist, axis=1)
-df2.columns = ['Limiting Nutrient', 'K common unit (uM)', 'in situ conc', 'lowconc', 'highconc', 'autotroph', 'eukaryote', 'Habitat', 'Li_liebig', 'Li_additive', 'Li_multiplicative', 'Li_PAT', 'conc range']
+df2.columns = ['Limiting Nutrient', 'K common unit (uM)', 'in situ conc', 'lowconc', 'highconc', 'Habitat', 'Li_liebig', 'Li_additive', 'Li_multiplicative', 'Li_PAT', 'conc range']
 
 # Subplot A
 
@@ -77,7 +83,7 @@ ogmarkers = markers
 #ax.scatter(df['K common unit (uM)'],df['conc low'], color=colors, yerr=df['conc low'])
 #ax.errorbar(df['K common unit (uM)'],df['conc low'], yerr=df['conc low'], fmt="o", color=colors)
 df2['conc range'].fillna(0, inplace=True)
-
+df2.to_csv('test.csv')
 for index, row in df2.iterrows():
     markers, caps, bars = axes[0].errorbar(x=row['in situ conc'],xerr=row['conc range']/2, y=row['K common unit (uM)'], markersize=5, fmt=marker_map[row['Habitat']], c=color_map[row['Limiting Nutrient']])
     [bar.set_alpha(0.4) for bar in bars]
@@ -98,11 +104,12 @@ axes[0].arrow(40,55,-20,0,head_width=5,head_length=5)
 axes[0].arrow(80,55,50,0,head_width=5,head_length=50)
 axes[0].annotate('less\nlimiting',xy=(220,40),
              horizontalalignment='left',fontsize=10)
-fig.text(0.22,0.24,r'Spearman $\rho$ = 0.74', fontsize=11)
-fig.text(0.22,0.2,r'p-value = $2\times10^{-8}$', fontsize=11)
+fig.text(0.22,0.24,r'Spearman $\rho$ = 0.75', fontsize=11)
+fig.text(0.22,0.2,r'p-value = $6\times10^{-8}$', fontsize=11)
 
 s, p = spearmanr(df2['K common unit (uM)'],df2['in situ conc'])
-slope, intercept, r, p, se = linregress(df2['in situ conc'], df2['K common unit (uM)'])
+#slope, intercept, r, p, se = linregress(df2['in situ conc'], df2['K common unit (uM)'])
+print(s, p)
 
 
 custom_lines = [Line2D([0], [0], color=rgb_values[0], lw=2),
@@ -149,7 +156,7 @@ jitterdf = pd.DataFrame(x, y)
 jitterdf['nutrient'] = nutrient
 jitterdf['habitat'] = habitats
 jitterdf.reset_index(inplace=True)
-
+jitterdf.to_csv('jitter.csv')
 jitterdf.columns = ['Li', 'model', 'nutrient', 'habitat']
 jitterdf['marker'] = jitterdf['habitat'].map(marker_map)
 #df_unit = jitterdf.groupby('model').median().reset_index()
@@ -167,6 +174,7 @@ for name, group in jitterdfgrouped:
 axes[1].set_yscale('symlog', linthresh=0.00001)
 axes[1].set_xlabel("")
 axes[1].set_ylabel('Rate limitation\ncoefficient $L^\mathrm{rate}_i$')
+plt.savefig("Figure3.pdf", dpi=400, bbox_inches='tight')
 
 axes[1].set_ylim([0,1.1])
 axes[1].set_yticks([0,0.00001,0.0001,0.001,0.01,0.1,1])
