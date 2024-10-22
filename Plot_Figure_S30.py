@@ -1,61 +1,55 @@
-import colimitation_data_analysis
-import colimitation_models
-import colimitation_plots
-import matplotlib
-from matplotlib import pyplot
-from matplotlib import colors
-from matplotlib.gridspec import GridSpec
 import numpy
+from matplotlib import pyplot
+import matplotlib
+import colimitation_models
+import colimitation_data_analysis
+import colimitation_plots
 import pandas
 
 
 def main():
 
-     # Get parameters for a rate model fitted to the experimental data
-     rate_model_to_plot = "pat_rmin"
-     dataframe = pandas.read_csv("./Data/Rate_data_fits_rep123.csv", index_col=False)
-     dataframe_filtered = dataframe[dataframe["Model name"] == rate_model_to_plot]
-     row_index = dataframe_filtered.index[0]
-     gmax, a1, a2, R1min, R2min = [float(x) for x in str(dataframe_filtered["Parameter values"][row_index]).split(";")]
+     # Number of replicate experiments
+     num_replicates = 3
+     rep_colors = ["tab:blue", "tab:red", "tab:orange"]
 
-     # Set up meshes for plots of fitted model
-     R1_list_rate = numpy.linspace(1e-4, 0.1, 100)
-     R2_list_rate = numpy.linspace(1e-4, 0.025, 100)
-     R1_mesh_rate, R2_mesh_rate = numpy.meshgrid(R1_list_rate, R2_list_rate)
-     L1_mesh_rate = numpy.zeros(R1_mesh_rate.shape)
-     L2_mesh_rate = numpy.zeros(R1_mesh_rate.shape)
-     Meff_mesh_rate = numpy.zeros(R1_mesh_rate.shape)
+     # Read virtual supplementations for each data replicate 
+     lim_data = [pandas.read_csv("./Data/Yield_data_lim_coeffs_rep" + str(r + 1) + ".csv", index_col=False) for r in range(num_replicates)]
 
-     # Iterate over points in R1-R2 space and calculate limitation coefficients and Meff
-     for i in range(len(R2_list_rate)):
-          for j in range(len(R1_list_rate)):
-               L1_mesh_rate[i][j] = colimitation_models.CalcLimCoeff(0, [R1_list_rate[j], R2_list_rate[i]], [a1, a2], gmax, rate_model_to_plot.strip("_rmin"))
-               L1_mesh_rate[i][j] = colimitation_models.CalcLimCoeff(1, [R1_list_rate[j], R2_list_rate[i]], [a1, a2], gmax, rate_model_to_plot.strip("_rmin"))
-               Meff_mesh_rate[i][j] = colimitation_models.CalcMeff([R1_list_rate[j], R2_list_rate[i]], [a1, a2], gmax, rate_model_to_plot.strip("_rmin"))
+     # L_threshold scan over a larger range to test number of virtual supplementations
+     # above that threshold in experimental data
+     L_threshold_range_large = numpy.linspace(0, 0.8, 17)
+     num_abs_colim_data = numpy.array([[((lim_data[r]["L1"] > L_threshold) & (lim_data[r]["L2"] > L_threshold)).sum() for r in range(num_replicates)] for L_threshold in L_threshold_range_large])
+ 
+     # L_threshold scan over a smaller range (based on the larger range) to test
+     # fraction of virtual supplementations above that threshold in both 
+     # experimental data and a simulated null model without colimitation
+     L_threshold_range_small = numpy.linspace(0, 0.2, 11)
+     fracs_abs_colim_data = numpy.array([[((lim_data[r]["L1"] > L_threshold) & (lim_data[r]["L2"] > L_threshold)).sum()/len(lim_data[r]["Meff"]) for r in range(num_replicates)] for L_threshold in L_threshold_range_small])
 
-################################################################################
+     # Read simulation data and calculate p-values
+     num_sims = 10000
+     null_model = "liebig_monod"
+     pvalues_abs_colim = [[] for r in range(num_replicates)]
+     fracs_abs_colim_sims_list = []
 
-     # Get parameters for a yield model fitted to the experimental data
-     yield_model_to_plot = "pat"
-     dataframe = pandas.read_csv("./Data/Yield_data_fits_rep123.csv", index_col=False)
-     dataframe_filtered = dataframe[dataframe["Model name"] == yield_model_to_plot]
-     row_index = dataframe_filtered.index[0]
-     Nmax, s1, s2 = [float(x) for x in str(dataframe_filtered["Parameter values"][row_index]).split(";")]
+     # Read fractions of virtual supplementations for all thresholds
+     dataframe = pandas.read_csv(f"./Data/Yield_sim_{null_model}_colim_fracs.csv", index_col=False)
 
-     # Set up meshes for plots of fitted model
-     R1_list_yield = numpy.linspace(1e-4, 10, 100)
-     R2_list_yield = numpy.linspace(1e-4, 10, 100)
-     R1_mesh_yield, R2_mesh_yield = numpy.meshgrid(R1_list_yield, R2_list_yield)
-     L1_mesh_yield = numpy.zeros(R1_mesh_yield.shape)
-     L2_mesh_yield = numpy.zeros(R1_mesh_yield.shape)
-     Meff_mesh_yield = numpy.zeros(R1_mesh_yield.shape)
+     # Iterate over L_threshold
+     for i in range(len(L_threshold_range_small)):
+          L_threshold = L_threshold_range_small[i]
+        
+          # Get fractions for this threshold
+          fracs_abs_colim_sims = list(dataframe[f"Fraction of virtual supplementations with L1 and L2 > {L_threshold}"])
+          fracs_abs_colim_sims_list.append(fracs_abs_colim_sims)
 
-     # Iterate over points in R1-R2 space and calculate limitation coefficients and Meff
-     for i in range(len(R2_list_yield)):
-          for j in range(len(R1_list_yield)):
-               L1_mesh_yield[i][j] = colimitation_models.CalcLimCoeff(0, [R1_list_yield[j], R2_list_yield[i]], [s1, s2], Nmax, yield_model_to_plot.strip("_rmin"))
-               L1_mesh_yield[i][j] = colimitation_models.CalcLimCoeff(1, [R1_list_yield[j], R2_list_yield[i]], [s1, s2], Nmax, yield_model_to_plot.strip("_rmin"))
-               Meff_mesh_yield[i][j] = colimitation_models.CalcMeff([R1_list_yield[j], R2_list_yield[i]], [s1, s2], Nmax, yield_model_to_plot.strip("_rmin"))
+          # Now calculate p-value for each experimental replicate against this
+          # null model
+          for r in range(num_replicates):
+               pvalue = sum(int(f > fracs_abs_colim_data[i][r]) for f in fracs_abs_colim_sims)/len(fracs_abs_colim_sims)
+               pvalues_abs_colim[r].append(pvalue)
+     pvalues_abs_colim = numpy.array(pvalues_abs_colim)
 
 ################################################################################
 
@@ -63,50 +57,56 @@ def main():
      pyplot.rcParams = colimitation_plots.SetrcParams(pyplot.rcParams)
 
      # Initialize figure
-     figure = pyplot.figure(figsize=(4*2, 3*1))
-     figure.subplots_adjust(wspace=0.6, hspace=0.4)
+     figure = pyplot.figure(figsize=(4*3, 3))
+     figure.subplots_adjust(wspace=0.5)
 
-################################################################################
+     # Plot number of virtual supplementations with L1 and L2 both above a threshold
+     axis = figure.add_subplot(1, 3, 1)
+     axis.text(-0.25, 1.1, "A", transform=axis.transAxes, fontsize=colimitation_plots.panel_label_size)
+     axis.set_xlabel("Threshold yield limitation coefficient $L^\mathrm{yield}$", fontsize=colimitation_plots.axis_label_size)
+     axis.set_ylabel("Number of supplementations with\n$L^\mathrm{yield}_\mathrm{glu}$ and $L^\mathrm{yield}_\mathrm{amm}$ above threshold", fontsize=colimitation_plots.axis_label_size)
+     axis.set_yscale("symlog", linthresh=1)
+     axis.set_xlim([min(L_threshold_range_large), max(L_threshold_range_large)])
+     axis.set_ylim([0, 1e3])
+     for r in range(num_replicates):
+          axis.plot(L_threshold_range_large, num_abs_colim_data[:, r], "-o", markersize=3, color=rep_colors[r], label="Rep " + str(r + 1))
+          axis.text(0.98, 0.98 - 0.07*r, r"\textbf{Rep " + str(r + 1) + "}", color=rep_colors[r], transform=axis.transAxes, ha="right", va="top", fontsize=colimitation_plots.legend_label_size)
 
-     # Number of rate-limiting resources
-     axis = figure.add_subplot(1, 2, 1)
-     axis.text(-0.33, 1.05, "A", transform=axis.transAxes, fontsize=colimitation_plots.panel_label_size)
-     axis.set_xlabel("Glucose concentration (mM)", fontsize=colimitation_plots.axis_label_size)
-     axis.set_ylabel("Ammonium concentration (mM)", fontsize=colimitation_plots.axis_label_size)
+     # Plot fraction of virtual supplementations with L1 and L2 both above a threshold
+     # For both experimental replicates and simulations
+     axis = figure.add_subplot(1, 3, 2)
+     axis.text(-0.25, 1.1, "B", transform=axis.transAxes, fontsize=colimitation_plots.panel_label_size)
+     axis.set_xlabel("Threshold yield limitation coefficient $L^\mathrm{yield}$", fontsize=colimitation_plots.axis_label_size)
+     axis.set_ylabel("Fraction of supplementations with\n$L^\mathrm{yield}_\mathrm{glu}$ and $L^\mathrm{yield}_\mathrm{amm}$ above threshold", fontsize=colimitation_plots.axis_label_size)
+     axis.set_xlim([-0.01, 0.21])
+     axis.set_ylim([0, 1])
+     for r in range(num_replicates):
+          axis.plot(L_threshold_range_small, fracs_abs_colim_data[:, r], "-o", markersize=3, color=rep_colors[r], label="Rep " + str(r + 1))
+          axis.text(0.98, 0.98 - 0.07*r, r"\textbf{Rep " + str(r + 1) + "}", color=rep_colors[r], transform=axis.transAxes, ha="right", va="top", fontsize=colimitation_plots.legend_label_size)
+     axis.text(0.98, 0.98 - 0.07*num_replicates, r"\textbf{Null model}" + "\n" + r"\textbf{no colim}", color="tab:purple", transform=axis.transAxes, ha="right", va="top", fontsize=colimitation_plots.legend_label_size)
+     boxes = axis.boxplot(fracs_abs_colim_sims_list, positions=L_threshold_range_small, widths=0.012, sym="", manage_ticks=False, patch_artist=True, zorder=0, 
+          medianprops={"color": "tab:purple", "linewidth": 0.5},
+          boxprops={"facecolor": "tab:purple", "edgecolor": "tab:purple", "linewidth": 0.5},
+          whiskerprops={"color": "tab:purple", "linewidth": 1.5},
+          capprops={"color": "tab:purple", "linewidth": 1.5}, label="Null model\n(no colim)")
+     axis.set_yscale("symlog", linthresh=1e-2)
 
-     contourfs = axis.contourf(R1_mesh_rate, R2_mesh_rate, Meff_mesh_rate, cmap="plasma", levels=numpy.linspace(1, 3, 11), zorder=0)
-     contours = axis.contour(R1_mesh_rate, R2_mesh_rate, Meff_mesh_rate, levels=contourfs.levels, colors="black", linewidths=0.25, zorder=1)
-     colorbar = figure.colorbar(contourfs, ax=axis, shrink=1.0)
-     colorbar.set_label("Number of rate-limiting factors $M^\mathrm{rate}_\mathrm{eff}$", fontsize=colimitation_plots.axis_label_size, rotation=270, labelpad=20)
-
-     axis.set_xlim([0, max(R1_list_rate)])
-     axis.set_ylim([0, max(R2_list_rate)])
-     axis.set_xticks(numpy.linspace(*axis.get_xlim(), 6))
-     axis.set_yticks(numpy.linspace(*axis.get_ylim(), 6))
-
-################################################################################
-
-     # Number of yield-limiting resources
-     axis = figure.add_subplot(1, 2, 2)
-     axis.text(-0.25, 1.05, "B", transform=axis.transAxes, fontsize=colimitation_plots.panel_label_size)
-     axis.set_xlabel("Glucose concentration (mM)", fontsize=colimitation_plots.axis_label_size)
-     axis.set_ylabel("Ammonium concentration (mM)", fontsize=colimitation_plots.axis_label_size)
-
-     contourfs = axis.contourf(R1_mesh_yield, R2_mesh_yield, Meff_mesh_yield, cmap="plasma", levels=numpy.linspace(1, 3, 11), zorder=0)
-     contours = axis.contour(R1_mesh_yield, R2_mesh_yield, Meff_mesh_yield, levels=contourfs.levels, colors="black", linewidths=0.25, zorder=1)
-     colorbar = figure.colorbar(contourfs, ax=axis, shrink=1.0)
-     colorbar.set_label("Number of yield-limiting factors $M^\mathrm{yield}_\mathrm{eff}$", fontsize=colimitation_plots.axis_label_size, rotation=270, labelpad=20)
-
-     axis.set_xlim([0, max(R1_list_yield)])
-     axis.set_ylim([0, max(R2_list_yield)])
-     axis.set_xticks(numpy.linspace(*axis.get_xlim(), 6))
-     axis.set_yticks(numpy.linspace(*axis.get_ylim(), 6))
-
-################################################################################
+     # Plot p-values for each experimental replicate against the null model at 
+     # each threshold
+     axis = figure.add_subplot(1, 3, 3)
+     axis.text(-0.25, 1.1, "C", transform=axis.transAxes, fontsize=colimitation_plots.panel_label_size)
+     axis.set_xlabel("Threshold yield limitation coefficient $L^\mathrm{yield}$", fontsize=colimitation_plots.axis_label_size)
+     axis.set_ylabel("$p$-value compared to null model (no colim)", fontsize=colimitation_plots.axis_label_size)
+     axis.set_yscale("symlog", linthresh=1e-3)
+     axis.set_ylim([0, 1])
+     axis.set_xlim([min(L_threshold_range_small), max(L_threshold_range_small)])
+     for r in range(num_replicates):
+          axis.plot(L_threshold_range_small, pvalues_abs_colim[r], "-o", markersize=3, color=rep_colors[r], label="Rep " + str(r + 1))  
+          axis.text(0.98, 0.02 + 0.07*(num_replicates - r), r"\textbf{Rep " + str(r + 1) + "}", color=rep_colors[r], transform=axis.transAxes, ha="right", va="top", fontsize=colimitation_plots.legend_label_size)     
 
      figure.savefig("Figure_S30.pdf", bbox_inches="tight")
 
-################################################################################
+#################################################################################
 
 
 if __name__ == '__main__':

@@ -148,7 +148,7 @@ def main():
      # Plot Meff distributions
      axis = figure.add_subplot(gs[1, 3])
      axis.text(-0.28, 1.05, "D", transform=axis.transAxes, fontsize=1.2*colimitation_plots.panel_label_size)
-     axis.set_xlabel("Fraction of virtual supplementations\nwith glucose-ammonium\ncolimitation ($L^\mathrm{rate}_\mathrm{glu},L^\mathrm{rate}_\mathrm{amm} > 0$)", fontsize=1.2*colimitation_plots.axis_label_size)
+     axis.set_xlabel("Fraction of supplementations\nwith glucose-ammonium\ncolimitation ($L^\mathrm{rate}_\mathrm{glu},L^\mathrm{rate}_\mathrm{amm} > 0$)", fontsize=1.2*colimitation_plots.axis_label_size)
      axis.set_ylabel("Probability density", fontsize=1.2*colimitation_plots.axis_label_size)
      for r in range(num_replicates):
           axis.axvline(fracs_rel_colim_data[r], linestyle="--", color=rep_colors[r])

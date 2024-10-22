@@ -1,120 +1,48 @@
 import colimitation_data_analysis
 import colimitation_models
 import colimitation_plots
+import matplotlib
 from matplotlib import pyplot
-import pandas
+from matplotlib import colors
 import numpy
-from scipy import stats
+import pandas
 
 
-def main():    
+def main():
 
-     # Number of experimental replicates and number of bootstrapped data sets
-     # from those replicates
+     # Number of replicate experiments
      num_replicates = 3
-     num_bootstraps = 100
 
-     # Colors for the experimental replicates
-     rep_colors = ["tab:blue", "tab:red", "tab:orange"]
+     # Number of R1 (glucose) and R2 (ammonium) values
+     num_R1_values = 11
+     num_R2_values = 7
 
-     # Lists for fitted parameters
-     fit_params_all_reps = []
-     fit_params_indiv_reps = [[] for r in range(num_replicates)]
-     fit_params_bootstraps = [[] for b in range(num_bootstraps)]
+     # Column labels for glucose and ammonium concentrations in data file
+     R1_label = "Glucose (mM)"
+     R2_label = "Ammonium (mM)"
 
-     # Get dataframes for fit to all replicates, to each replicate individually,
-     # and to all bootstrapped data sets.  Shape is (num replicates or bootstraps,
-     # num models, num parameters).  
-     fit_data_all_reps = pandas.read_csv("./Data/Yield_data_fits_rep123.csv", index_col=False)
-     fit_data_indiv_reps = [pandas.read_csv("./Data/Yield_data_fits_rep" + str(r + 1) + ".csv", index_col=False) for r in range(num_replicates)]
-     fit_data_bootstraps = pandas.read_csv("./Data/Yield_bootstraps_fits.csv", index_col=False)
+     # Column labels for replicate yield measurements in data file
+     yield_labels = ["Growth yield (OD 600 nm) rep " + str(r + 1) for r in range(num_replicates)]
 
-     # Get list of indices for models that have Rmin
-     rmin_model_indices = [i for i in range(len(colimitation_models.all_2D_trait_models)) if "rmin" in colimitation_models.all_2D_trait_models[i]]
+     # Read R1, R2, and yield data into 2D meshes
+     skiprows = 11
+     sheet_name = "Table 1 Growth yields"
+     R1_mesh_data, R2_mesh_data, yield_mesh_data = colimitation_data_analysis.Read2DScan("./Data/Dataset_S2.xlsx", R1_label, R2_label, yield_labels, num_R1_values, num_R2_values, sheet_name=sheet_name, skiprows=skiprows) 
+     R1R2_list_data, yield_list_data = colimitation_data_analysis.Convert2DScanDataForFit(R1_mesh_data, R2_mesh_data, yield_mesh_data, reps=range(num_replicates))
 
-     # Iterate over all fitted models
-     for m in range(len(colimitation_models.all_2D_trait_models)):
-
-          model_name = colimitation_models.all_2D_trait_models[m]
-
-          # For this model get parameters from fits to all replicates
-          df_this_model = fit_data_all_reps[fit_data_all_reps["Model name"] == model_name]
-          row_index = df_this_model.index[0]
-          Rsq = float(df_this_model["R^2"])
-          akaike_weight = float(df_this_model["Akaike weight"])
-          params = [float(x) for x in str(df_this_model["Parameter values"][row_index]).split(";")]
-          zmax, s1, s2 = params[:3]
-          if "rmin" not in model_name:
-               fit_data = [Rsq, akaike_weight, zmax, s1, s2, s2/s1, zmax/s1, zmax/s2]
-          else:      
-               R1min, R2min = params[-2:]
-               fit_data = [Rsq, akaike_weight, zmax, s1, s2, s2/s1, zmax/s1, zmax/s2, R1min, R2min]
-          fit_params_all_reps.append(fit_data)     
-
-          # For this model get parameters from fits to individual replicates
-          for r in range(num_replicates):
-               df_this_model = fit_data_indiv_reps[r][fit_data_indiv_reps[r]["Model name"] == model_name]
-               row_index = df_this_model.index[0]
-               Rsq = float(df_this_model["R^2"])
-               akaike_weight = float(df_this_model["Akaike weight"])
-               params = [float(x) for x in str(df_this_model["Parameter values"][row_index]).split(";")]
-               zmax, s1, s2 = params[:3]
-               if "rmin" not in model_name:
-                    fit_data = [Rsq, akaike_weight, zmax, s1, s2, s2/s1, zmax/s1, zmax/s2]
-               else:      
-                    R1min, R2min = params[-2:]
-                    fit_data = [Rsq, akaike_weight, zmax, s1, s2, s2/s1, zmax/s1, zmax/s2, R1min, R2min]
-               fit_params_indiv_reps[r].append(fit_data)
-
-          # For this model get parameters from fits to each bootstrapped data set
-          for b in range(num_bootstraps):
-               df_this_model = fit_data_bootstraps[fit_data_bootstraps["Model name"] == model_name]
-               row_index = df_this_model.index[0]
-               Rsq = float(df_this_model[f"R^2 bootstrap {b + 1}"])
-               akaike_weight = float(df_this_model[f"Akaike weight bootstrap {b + 1}"])
-               params = [float(x) for x in str(df_this_model[f"Parameter values bootstrap {b + 1}"][row_index]).split(";")]
-               zmax, s1, s2 = params[:3]
-               if "rmin" not in model_name:
-                    fit_data = [Rsq, akaike_weight, zmax, s1, s2, s2/s1, zmax/s1, zmax/s2]
-               else:      
-                    R1min, R2min = params[-2:]
-                    fit_data = [Rsq, akaike_weight, zmax, s1, s2, s2/s1, zmax/s1, zmax/s2, R1min, R2min]
-               fit_params_bootstraps[b].append(fit_data)
-
-     # Axis labels for each fit parameter to plot
-     ylabels = [    "Quality of growth yield\nmodel fit $R^2$", 
-                    "Relative Akaike weight", 
-                    "Maximum growth yield\n$N_\mathrm{max}$ (OD 600 nm)",
-                    "Growth yield per\nglucose $a_\mathrm{glucose}$\n(OD 600 nm per mM glucose)",
-                    "Growth yield per\nammonium $a_\mathrm{ammonium}$\n(OD 600 nm per mM ammonium)",
-                    "Glucose-ammonium\nstoichiometry $a_\mathrm{ammonium}/a_\mathrm{glucose}$\n(mM glucose per mM ammonium)",
-                    "Glucose threshold\n$N_\mathrm{max}/a_\mathrm{glucose}$ (mM)",
-                    "Ammonium threshold\n$N_\mathrm{max}/a_\mathrm{ammonium}$ (mM)",
-                    "Minimum glucose\nconcentration $R_\mathrm{glucose,min}$ (mM)",
-                    "Minimum ammonium\nconcentration $R_\mathrm{ammonium,min}$ (mM)"]
-
-     # Axis limits for each fit parameter to plot
-     ylims = [ (0.9, 1),
-               (10**(-12), 10**(0)),
-               (0.4, 0.8),
-               (0, 0.4),
-               (0, 0.7),
-               (0.5, 2.5),
-               (1, 6),
-               (0, 6),
-               (0, 0.1),
-               (0, 0.1)]
-
-     # Perform Mann-Whitney U test to compare R^2 distributions from the bootstrapped
-     # data sets, just between the top few models in the all-replicate fits
-     print("p-values for Mann-Whitney U test between bootstrapped R^2 distributions")
-     ref_model_index = 0
-     for m in range(len(colimitation_models.all_2D_trait_models)):
-          if m == ref_model_index: continue
-          Rsq1 = [fit_params_bootstraps[b][ref_model_index][0] for b in range(num_bootstraps)]
-          Rsq2 = [fit_params_bootstraps[b][m][0] for b in range(num_bootstraps)]
-          result = stats.mannwhitneyu(Rsq1, Rsq2)
-          print("\t", colimitation_models.all_2D_trait_models[ref_model_index], "vs.", colimitation_models.all_2D_trait_models[m], "p =", result.pvalue)
+     # Calculate yield means and SDs over replicates
+     yield_mesh_data_means = numpy.zeros(R1_mesh_data.shape)
+     yield_mesh_data_sds = numpy.zeros(R1_mesh_data.shape)
+     for i in range(len(yield_mesh_data)):
+          for j in range(len(yield_mesh_data[i])):
+               # Get all yield data for this well, skip any entries that are strings ("not fit")
+               yields = [r for r in yield_mesh_data[i][j] if not isinstance(r, str)]
+               if len(yields) != 0:
+                    yield_mesh_data_means[i][j] = numpy.mean(yields)
+                    yield_mesh_data_sds[i][j] = numpy.std(yields)
+               else:
+                    yield_mesh_data_means[i][j] = numpy.nan
+                    yield_mesh_data_sds[i][j] = numpy.nan
 
 ################################################################################
 
@@ -122,59 +50,48 @@ def main():
      pyplot.rcParams = colimitation_plots.SetrcParams(pyplot.rcParams)
 
      # Initialize figure
-     figure = pyplot.figure(figsize=(18, 3*len(ylabels)/2))
-     figure.subplots_adjust(hspace=0.1, wspace=0.15)
+     figure = pyplot.figure(figsize=(4*2, 3))
+     figure.subplots_adjust(wspace=0.6)
 
-     # Iterate over each fit parameter to plot
-     for p in range(len(ylabels)):
+     # Plot yield 1D scans over glucose
+     axis = figure.add_subplot(1, 2, 1)
+     axis.text(-0.3, 1.05, "A", transform=axis.transAxes, fontsize=colimitation_plots.panel_label_size)
+     axis.set_xlabel("Reciprocal added glucose\nconcentration (1/mM)", fontsize=colimitation_plots.axis_label_size)
+     axis.set_ylabel("Reciprocal growth yield (1/OD 600 nm)", fontsize=colimitation_plots.axis_label_size)
+     axis.set_xlim([-0.4, 14])
+     axis.set_xticks(numpy.linspace(0, 14, 8))
+     axis.set_ylim([0, 80])
 
-          # Set up axis
-          axis = figure.add_subplot(int(len(ylabels)/2), 2, p + 1)
-          axis.set_ylabel(ylabels[p], fontsize=colimitation_plots.axis_label_size)
-          axis.set_xlim([-0.5, len(colimitation_models.all_2D_trait_models) - 0.5])
-          axis.set_ylim(ylims[p])
-          if "Akaike" in ylabels[p]:
-               axis.set_yscale("log")
-          for i in range(len(colimitation_models.all_2D_trait_models)):
-               axis.axvline(i, linestyle="--", linewidth=0.25, color="0.8", zorder=-1)
+     norm = colors.SymLogNorm(linthresh=R2_mesh_data[:, 0][1], vmin=min(R2_mesh_data[:, 0]), vmax=max(R2_mesh_data[:, 0]))
+     cmap = matplotlib.colormaps["viridis"]
+     sm = pyplot.cm.ScalarMappable(cmap=cmap, norm=norm)
+     sm.set_array([])
+     ammonium_colors = sm.to_rgba(R2_mesh_data[:, 0])
+     colorbar = figure.colorbar(sm, ax=axis)
+     colorbar.set_label("Added ammonium\nconcentration (mM)", fontsize=colimitation_plots.axis_label_size, rotation=270, labelpad=25)
+     for i in range(len(yield_mesh_data_means)):
+          #axis.errorbar(R1_mesh_data[i], yield_mesh_data_means[i], yerr=yield_mesh_data_sds[i], color=ammonium_colors[i], marker="o", markersize=5, linestyle="none")
+          axis.plot(1/R1_mesh_data[i], 1/yield_mesh_data_means[i], "-o", color=ammonium_colors[i])
 
-          # If the parameter to plot is Rmin, use only a subset of model indices
-          # for Rmin models
-          if "Minimum" in ylabels[p]:
-               model_indices = rmin_model_indices
-          else:
-               model_indices = range(len(colimitation_models.all_2D_trait_models))
-     
-          # Plot fit parameters for all-replicate fit
-          axis.scatter(model_indices, [fit_params_all_reps[i][p] for i in model_indices], color="black", s=10, zorder=1, label="Combined reps")
-     
-          # Plot fit parameters for individual replicates
-          for r in range(num_replicates):
-               axis.scatter(model_indices, [fit_params_indiv_reps[r][i][p] for i in model_indices], marker="_", label="Rep " + str(r + 1), color=rep_colors[r], zorder=2)
-     
-          # Plot fit parameters for bootstrapped data
-          params_bootstraps = numpy.array([[fit_params_bootstraps[b][i][p] for i in model_indices] for b in range(num_bootstraps)])
-          boxes = axis.boxplot(params_bootstraps, positions=model_indices, sym="", patch_artist=True, zorder=0, 
-               medianprops={"color": "0.8", "linewidth": 0.5},
-               boxprops={"facecolor": "0.8", "edgecolor": "0.8", "linewidth": 0.5},
-               whiskerprops={"color": "0.8", "linewidth": 1.5},
-               capprops={"color": "0.8", "linewidth": 1.5}, label="Bootstrapped data")
+     # Plot yield 1D scans over ammonium
+     axis = figure.add_subplot(1, 2, 2)
+     axis.text(-0.3, 1.05, "B", transform=axis.transAxes, fontsize=colimitation_plots.panel_label_size)
+     axis.set_xlabel("Reciprocal added ammonium\nconcentration (1/mM)", fontsize=colimitation_plots.axis_label_size)
+     axis.set_ylabel("Reciprocal growth yield (1/OD 600 nm)", fontsize=colimitation_plots.axis_label_size)
+     axis.set_xlim([-0.2, 6.2])
+     axis.set_xticks(numpy.linspace(0, 6, 7))
+     axis.set_ylim([0, 80])
 
-          # Show legend in first plot only
-          if p == 0:
-               axis.legend(loc=(0, 1.8), fontsize=colimitation_plots.axis_label_size)
-
-          # Add top tick marks for first two panels
-          if p == 0 or p == 1:
-               axis_twiny = axis.twiny()
-               axis_twiny.set_xticks(range(len(colimitation_models.all_2D_trait_models)), labels=colimitation_models.all_2D_trait_models_formatted, fontsize=colimitation_plots.tick_label_size, rotation=90)
-               axis_twiny.set_xlim([-0.5, len(colimitation_models.all_2D_trait_models) - 0.5])
-
-          # Label bottom ticks in last two plots only
-          if p == (len(ylabels) - 2) or p == (len(ylabels) - 1):
-               axis.set_xticks(range(len(colimitation_models.all_2D_trait_models)), labels=colimitation_models.all_2D_trait_models_formatted, fontsize=colimitation_plots.tick_label_size, rotation=90)
-          else:
-               axis.set_xticks(range(len(colimitation_models.all_2D_trait_models)), labels=[])
+     norm = colors.SymLogNorm(linthresh=R1_mesh_data.T[:, 0][2], vmin=min(R1_mesh_data.T[:, 0]), vmax=max(R1_mesh_data.T[:, 0]))
+     cmap = matplotlib.colormaps["cividis"]
+     sm = pyplot.cm.ScalarMappable(cmap=cmap, norm=norm)
+     sm.set_array([])
+     glucose_colors = sm.to_rgba(R1_mesh_data.T[:, 0])
+     colorbar = figure.colorbar(sm, ax=axis)
+     colorbar.set_label("Added glucose\nconcentration (mM)", fontsize=colimitation_plots.axis_label_size, rotation=270, labelpad=25)
+     for i in range(len(yield_mesh_data_means.T)):
+          #axis.errorbar(R2_mesh_data.T[i], yield_mesh_data_means.T[i], yerr=yield_mesh_data_sds.T[i], color=glucose_colors[i], marker="o", markersize=5, linestyle="none")
+          axis.plot(1/R2_mesh_data.T[i], 1/yield_mesh_data_means.T[i], "-o", color=glucose_colors[i])
 
      figure.savefig("Figure_S23.pdf", bbox_inches="tight")
 

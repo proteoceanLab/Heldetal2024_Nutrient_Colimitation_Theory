@@ -11,7 +11,7 @@ def main():
 
      # Get true parameter values that were used for simulations
      dataframe = pandas.read_csv("./Data/Yield_data_fits_rep123.csv", index_col=False)
-     true_model = "liebig_monod"
+     true_model = "liebig_blackman"
      true_model_formatted = colimitation_models.all_2D_trait_models_formatted[colimitation_models.all_2D_trait_models.index(true_model)]
      dataframe_filtered = dataframe[dataframe["Model name"] == true_model]
      row_index = dataframe_filtered.index[0]
@@ -58,13 +58,13 @@ def main():
      ylabels = [    "Quality of growth yield\nmodel fit $R^2$", 
                     "Relative Akaike weight", 
                     "Maximum growth yield\n$N_\mathrm{max}$ (OD 600 nm)",
-                    "Growth yield per\nglucose $a_\mathrm{glucose}$\n(OD 600 nm per mM glucose)",
-                    "Growth yield per\nammonium $a_\mathrm{ammonium}$\n(OD 600 nm per mM ammonium)",
-                    "Glucose-ammonium\nstoichiometry $a_\mathrm{ammonium}/a_\mathrm{glucose}$\n(mM glucose per mM ammonium)",
-                    "Glucose threshold\n$N_\mathrm{max}/a_\mathrm{glucose}$ (mM)",
-                    "Ammonium threshold\n$N_\mathrm{max}/a_\mathrm{ammonium}$ (mM)",
-                    "Minimum glucose\nconcentration $R_\mathrm{glucose,min}$ (mM)",
-                    "Minimum ammonium\nconcentration $R_\mathrm{ammonium,min}$ (mM)"]
+                    "Biomass-glucose stoichiometry $s_\mathrm{glu}$\n(OD 600 nm per mM glucose)",
+                    "Biomass-ammonium stoichiometry $s_\mathrm{amm}$\n(OD 600 nm per mM ammonium)",
+                    "Glucose-ammonium\nstoichiometry $s_\mathrm{amm}/s_\mathrm{glu}$\n(mM glucose per mM ammonium)",
+                    "Glucose half-saturation\nconcentration $N_\mathrm{max}/s_\mathrm{glu}$ (mM)",
+                    "Ammonium half-saturation\nconcentration $N_\mathrm{max}/s_\mathrm{amm}$ (mM)",
+                    "Minimum glucose\nconcentration $R_\mathrm{glu,min}$ (mM)",
+                    "Minimum ammonium\nconcentration $R_\mathrm{amm,min}$ (mM)"]
 
      # Axis limits for each fit parameter to plot
      ylims = [ (0.9, 1),
@@ -73,7 +73,7 @@ def main():
                (0, 0.4),
                (0, 0.7),
                (0.5, 2.5),
-               (1, 6),
+               (1, 13),
                (0, 6),
                (0, 0.1),
                (0, 0.1)]

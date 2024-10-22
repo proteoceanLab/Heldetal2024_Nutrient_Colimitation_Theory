@@ -58,7 +58,7 @@ def main():
      # Plot colimitation dependence on resource concentration
      axis = pyplot.subplot2grid((14, 3), (4, 0), rowspan=2)
      axis.set_xlabel("Resource concentration $R$", fontsize=colimitation_plots.axis_label_size)
-     axis.set_ylabel("No.\nlimiting\nresources\n$M_\mathrm{eff}$", fontsize=colimitation_plots.axis_label_size)
+     axis.set_ylabel("No.\nlimiting\nfactors\n$M_\mathrm{eff}$", fontsize=colimitation_plots.axis_label_size)
      axis.set_xlim([0, max(Rs_blackman)])
      axis.set_ylim([0.9, 2.1])
      axis.set_xticks([])
@@ -156,7 +156,7 @@ def main():
      axis.tick_params(axis="y", labelsize=0.8*colimitation_plots.tick_label_size, pad=0) 
      axis.plot(time_points_growth, Ns[0], "-", color="black", linewidth=2)
      axis.text(9, 7, "$N$", fontsize=colimitation_plots.axis_label_size, color="black")
-     axis.set_title(r"\textbf{Batch growth}", fontsize=1.3*colimitation_plots.axis_label_size)
+     axis.set_title(r"\textbf{Batch dynamics}", fontsize=1.3*colimitation_plots.axis_label_size)
 
      # Plot resource concentrations over batch cycle on right axis
      axis_twinx = axis.twinx()
@@ -206,7 +206,7 @@ def main():
      axis.set_xticks(numpy.linspace(0, 1.5, 4))
      axis.set_yticks(numpy.linspace(0, 1.5, 4))
      axis.set_aspect("equal")
-     axis.set_title(r"\textbf{Batch growth}", fontsize=1.3*colimitation_plots.axis_label_size)
+     axis.set_title(r"\textbf{Batch dynamics}", fontsize=1.3*colimitation_plots.axis_label_size)
 
      # Draw resource depletion trajectory
      line, = axis.plot(Rs[0], Rs[1], "-", linewidth=3, color="tab:purple", zorder=0)
@@ -262,7 +262,7 @@ def main():
      axis.tick_params(axis="y", labelsize=0.8*colimitation_plots.tick_label_size, pad=0) 
      axis.plot(time_points_growth, Ns[0], "-", color="black", linewidth=2)
      axis.text(20, 3, "$N$", fontsize=colimitation_plots.axis_label_size, color="black")
-     axis.set_title(r"\textbf{Chemostat growth}", fontsize=1.3*colimitation_plots.axis_label_size)
+     axis.set_title(r"\textbf{Chemostat dynamics}", fontsize=1.3*colimitation_plots.axis_label_size)
 
      # Plot resource concentrations for chemostat on right axis
      axis_twinx = axis.twinx()
@@ -308,7 +308,7 @@ def main():
      axis.set_xticks(numpy.linspace(0, 1.5, 4))
      axis.set_yticks(numpy.linspace(0, 1.5, 4))
      axis.set_aspect("equal")
-     axis.set_title(r"\textbf{Chemostat growth}", fontsize=1.3*colimitation_plots.axis_label_size)
+     axis.set_title(r"\textbf{Chemostat dynamics}", fontsize=1.3*colimitation_plots.axis_label_size)
 
      # Draw resource depletion trajectory
      line, = axis.plot(Rs[0], Rs[1], "-", linewidth=3, color="tab:purple", zorder=0)

@@ -1,55 +1,93 @@
-import numpy
-from matplotlib import pyplot
-import matplotlib
-import colimitation_models
 import colimitation_data_analysis
+import colimitation_models
 import colimitation_plots
+from matplotlib import pyplot
 import pandas
+import numpy
+from scipy import stats
 
 
-def main():
+def main():    
 
-     # Number of replicate experiments
-     num_replicates = 3
-     rep_colors = ["tab:blue", "tab:red", "tab:orange"]
+     # Get true parameter values that were used for simulations
+     dataframe = pandas.read_csv("./Data/Yield_data_fits_rep123.csv", index_col=False)
+     true_model = "pat"
+     true_model_formatted = colimitation_models.all_2D_trait_models_formatted[colimitation_models.all_2D_trait_models.index(true_model)]
+     dataframe_filtered = dataframe[dataframe["Model name"] == true_model]
+     row_index = dataframe_filtered.index[0]
+     zmax, s1, s2 = [float(x) for x in str(dataframe_filtered["Parameter values"][row_index]).split(";")]
+     true_parameters = [zmax, s1, s2, s2/s1, zmax/s1, zmax/s2, 0, 0]
 
-     # Read virtual supplementations for each data replicate 
-     lim_data = [pandas.read_csv("./Data/Yield_data_lim_coeffs_rep" + str(r + 1) + ".csv", index_col=False) for r in range(num_replicates)]
-
-     # L_threshold scan over a larger range to test number of virtual supplementations
-     # above that threshold in experimental data
-     L_threshold_range_large = numpy.linspace(0, 0.8, 17)
-     num_abs_colim_data = numpy.array([[((lim_data[r]["L1"] > L_threshold) & (lim_data[r]["L2"] > L_threshold)).sum() for r in range(num_replicates)] for L_threshold in L_threshold_range_large])
- 
-     # L_threshold scan over a smaller range (based on the larger range) to test
-     # fraction of virtual supplementations above that threshold in both 
-     # experimental data and a simulated null model without colimitation
-     L_threshold_range_small = numpy.linspace(0, 0.2, 11)
-     fracs_abs_colim_data = numpy.array([[((lim_data[r]["L1"] > L_threshold) & (lim_data[r]["L2"] > L_threshold)).sum()/len(lim_data[r]["Meff"]) for r in range(num_replicates)] for L_threshold in L_threshold_range_small])
-
-     # Read simulation data and calculate p-values
+     # Number of simulated data sets
      num_sims = 10000
-     null_model = "liebig_monod"
-     pvalues_abs_colim = [[] for r in range(num_replicates)]
-     fracs_abs_colim_sims_list = []
 
-     # Read fractions of virtual supplementations for all thresholds
-     dataframe = pandas.read_csv(f"./Data/Yield_sim_{null_model}_colim_fracs.csv", index_col=False)
+     # Lists for fitted parameters
+     fit_params_sims = [[] for s in range(num_sims)]
 
-     # Iterate over L_threshold
-     for i in range(len(L_threshold_range_small)):
-          L_threshold = L_threshold_range_small[i]
-        
-          # Get fractions for this threshold
-          fracs_abs_colim_sims = list(dataframe[f"Fraction of virtual supplementations with L1 and L2 > {L_threshold}"])
-          fracs_abs_colim_sims_list.append(fracs_abs_colim_sims)
+     # Get list of indices for models that have Rmin
+     rmin_model_indices = [i for i in range(len(colimitation_models.all_2D_trait_models)) if "rmin" in colimitation_models.all_2D_trait_models[i]]
 
-          # Now calculate p-value for each experimental replicate against this
-          # null model
-          for r in range(num_replicates):
-               pvalue = sum(int(f > fracs_abs_colim_data[i][r]) for f in fracs_abs_colim_sims)/len(fracs_abs_colim_sims)
-               pvalues_abs_colim[r].append(pvalue)
-     pvalues_abs_colim = numpy.array(pvalues_abs_colim)
+     # Read fit data for simulations
+     fit_data_sim = pandas.read_csv(f"./Data/Yield_sim_{true_model}_fits.csv", index_col=False)
+
+     # Get parameters from fits to each simulated data set
+     for s in range(num_sims):
+
+          # Iterate over all fitted models
+          for model_name in colimitation_models.all_2D_trait_models:
+
+               df_this_model = fit_data_sim[fit_data_sim["Model name"] == model_name]
+               row_index = df_this_model.index[0]
+               Rsq = float(df_this_model[f"R^2 sim {s + 1}"])
+               akaike_weight = float(df_this_model[f"Akaike weight sim {s + 1}"])
+               params = []
+               for x in str(df_this_model[f"Parameter values sim {s + 1}"][row_index]).split(";"):
+                    if x == "NA":
+                         params.append(numpy.nan)
+                    else:
+                         params.append(float(x))
+               zmax, s1, s2 = params[:3]
+               if "rmin" not in model_name:
+                    fit_data = [Rsq, akaike_weight, zmax, s1, s2, s2/s1, zmax/s1, zmax/s2]
+               else:      
+                    R1min, R2min = params[-2:]
+                    fit_data = [Rsq, akaike_weight, zmax, s1, s2, s2/s1, zmax/s1, zmax/s2, R1min, R2min]
+               fit_params_sims[s].append(fit_data)
+
+     # Axis labels for each fit parameter to plot
+     ylabels = [    "Quality of growth yield\nmodel fit $R^2$", 
+                    "Relative Akaike weight", 
+                    "Maximum growth yield\n$N_\mathrm{max}$ (OD 600 nm)",
+                    "Biomass-glucose stoichiometry $s_\mathrm{glu}$\n(OD 600 nm per mM glucose)",
+                    "Biomass-ammonium stoichiometry $s_\mathrm{amm}$\n(OD 600 nm per mM ammonium)",
+                    "Glucose-ammonium\nstoichiometry $s_\mathrm{amm}/s_\mathrm{glu}$\n(mM glucose per mM ammonium)",
+                    "Glucose half-saturation\nconcentration $N_\mathrm{max}/s_\mathrm{glu}$ (mM)",
+                    "Ammonium half-saturation\nconcentration $N_\mathrm{max}/s_\mathrm{amm}$ (mM)",
+                    "Minimum glucose\nconcentration $R_\mathrm{glu,min}$ (mM)",
+                    "Minimum ammonium\nconcentration $R_\mathrm{amm,min}$ (mM)"]
+
+     # Axis limits for each fit parameter to plot
+     ylims = [ (0.9, 1),
+               (10**(-12), 10**(0)),
+               (0.4, 0.8),
+               (0, 0.4),
+               (0, 0.7),
+               (0.5, 2.5),
+               (1, 6),
+               (0, 6),
+               (0, 0.1),
+               (0, 0.1)]
+
+     # Perform Mann-Whitney U test to compare R^2 distributions from the simulated
+     # data sets
+     print("p-values for Mann-Whitney U test between simulated R^2 distributions")
+     ref_model_index = 0
+     for m in range(len(colimitation_models.all_2D_trait_models)):
+          if m == ref_model_index: continue
+          Rsq1 = [fit_params_sims[s][ref_model_index][0] for s in range(num_sims) if not numpy.isnan(fit_params_sims[s][ref_model_index][0])]
+          Rsq2 = [fit_params_sims[s][m][0] for s in range(num_sims) if not numpy.isnan(fit_params_sims[s][m][0])]
+          result = stats.mannwhitneyu(Rsq1, Rsq2)
+          print("\t", colimitation_models.all_2D_trait_models[ref_model_index], "vs.", colimitation_models.all_2D_trait_models[m], "p =", result.pvalue)
 
 ################################################################################
 
@@ -57,56 +95,61 @@ def main():
      pyplot.rcParams = colimitation_plots.SetrcParams(pyplot.rcParams)
 
      # Initialize figure
-     figure = pyplot.figure(figsize=(4*3, 3))
-     figure.subplots_adjust(wspace=0.5)
+     figure = pyplot.figure(figsize=(18, 3*len(ylabels)/2))
+     figure.subplots_adjust(hspace=0.1, wspace=0.15)
 
-     # Plot number of virtual supplementations with L1 and L2 both above a threshold
-     axis = figure.add_subplot(1, 3, 1)
-     axis.text(-0.25, 1.1, "A", transform=axis.transAxes, fontsize=colimitation_plots.panel_label_size)
-     axis.set_xlabel("Threshold yield limitation coefficient $L^\mathrm{yield}$", fontsize=colimitation_plots.axis_label_size)
-     axis.set_ylabel("Number of virtual supplementations with\n$L^\mathrm{yield}_\mathrm{glucose}$ and $L^\mathrm{yield}_\mathrm{ammonium}$ above threshold", fontsize=colimitation_plots.axis_label_size)
-     axis.set_yscale("symlog", linthresh=1)
-     axis.set_xlim([min(L_threshold_range_large), max(L_threshold_range_large)])
-     axis.set_ylim([0, 1e3])
-     for r in range(num_replicates):
-          axis.plot(L_threshold_range_large, num_abs_colim_data[:, r], "-o", markersize=3, color=rep_colors[r], label="Rep " + str(r + 1))
-          axis.text(0.98, 0.98 - 0.07*r, r"\textbf{Rep " + str(r + 1) + "}", color=rep_colors[r], transform=axis.transAxes, ha="right", va="top", fontsize=colimitation_plots.legend_label_size)
+     # Iterate over each fit parameter to plot
+     for p in range(len(ylabels)):
 
-     # Plot fraction of virtual supplementations with L1 and L2 both above a threshold
-     # For both experimental replicates and simulations
-     axis = figure.add_subplot(1, 3, 2)
-     axis.text(-0.25, 1.1, "B", transform=axis.transAxes, fontsize=colimitation_plots.panel_label_size)
-     axis.set_xlabel("Threshold yield limitation coefficient $L^\mathrm{yield}$", fontsize=colimitation_plots.axis_label_size)
-     axis.set_ylabel("Fraction of virtual supplementations with\n$L^\mathrm{yield}_\mathrm{glucose}$ and $L^\mathrm{yield}_\mathrm{ammonium}$ above threshold", fontsize=colimitation_plots.axis_label_size)
-     axis.set_xlim([-0.01, 0.21])
-     axis.set_ylim([0, 1])
-     for r in range(num_replicates):
-          axis.plot(L_threshold_range_small, fracs_abs_colim_data[:, r], "-o", markersize=3, color=rep_colors[r], label="Rep " + str(r + 1))
-          axis.text(0.98, 0.98 - 0.07*r, r"\textbf{Rep " + str(r + 1) + "}", color=rep_colors[r], transform=axis.transAxes, ha="right", va="top", fontsize=colimitation_plots.legend_label_size)
-     axis.text(0.98, 0.98 - 0.07*num_replicates, r"\textbf{Null model}" + "\n" + r"\textbf{no colim}", color="tab:purple", transform=axis.transAxes, ha="right", va="top", fontsize=colimitation_plots.legend_label_size)
-     boxes = axis.boxplot(fracs_abs_colim_sims_list, positions=L_threshold_range_small, widths=0.012, sym="", manage_ticks=False, patch_artist=True, zorder=0, 
-          medianprops={"color": "tab:purple", "linewidth": 0.5},
-          boxprops={"facecolor": "tab:purple", "edgecolor": "tab:purple", "linewidth": 0.5},
-          whiskerprops={"color": "tab:purple", "linewidth": 1.5},
-          capprops={"color": "tab:purple", "linewidth": 1.5}, label="Null model\n(no colim)")
-     axis.set_yscale("symlog", linthresh=1e-2)
+          # Set up axis
+          axis = figure.add_subplot(int(len(ylabels)/2), 2, p + 1)
+          axis.set_ylabel(ylabels[p], fontsize=colimitation_plots.axis_label_size)
+          axis.set_xlim([-0.5, len(colimitation_models.all_2D_trait_models) - 0.5])
+          axis.set_ylim(ylims[p])
+          if "Akaike" in ylabels[p]:
+               axis.set_yscale("log")
+          for i in range(len(colimitation_models.all_2D_trait_models)):
+               axis.axvline(i, linestyle="--", linewidth=0.25, color="0.8", zorder=-1)
 
-     # Plot p-values for each experimental replicate against the null model at 
-     # each threshold
-     axis = figure.add_subplot(1, 3, 3)
-     axis.text(-0.25, 1.1, "C", transform=axis.transAxes, fontsize=colimitation_plots.panel_label_size)
-     axis.set_xlabel("Threshold yield limitation coefficient $L^\mathrm{yield}$", fontsize=colimitation_plots.axis_label_size)
-     axis.set_ylabel("$p$-value compared to null model (no colim)", fontsize=colimitation_plots.axis_label_size)
-     axis.set_yscale("symlog", linthresh=1e-3)
-     axis.set_ylim([0, 1])
-     axis.set_xlim([min(L_threshold_range_small), max(L_threshold_range_small)])
-     for r in range(num_replicates):
-          axis.plot(L_threshold_range_small, pvalues_abs_colim[r], "-o", markersize=3, color=rep_colors[r], label="Rep " + str(r + 1))  
-          axis.text(0.98, 0.02 + 0.07*(num_replicates - r), r"\textbf{Rep " + str(r + 1) + "}", color=rep_colors[r], transform=axis.transAxes, ha="right", va="top", fontsize=colimitation_plots.legend_label_size)     
+          # If the parameter to plot is Rmin, use only a subset of model indices
+          # for Rmin models
+          if "Minimum" in ylabels[p]:
+               model_indices = rmin_model_indices
+          else:
+               model_indices = range(len(colimitation_models.all_2D_trait_models))
+     
+          # Plot fit parameters for simulated data
+          params_sims = [[fit_params_sims[s][i][p] for s in range(num_sims) if not numpy.isnan(fit_params_sims[s][i][p])] for i in model_indices]
+          boxes = axis.boxplot(params_sims, positions=model_indices, sym="", patch_artist=True, zorder=0, 
+               medianprops={"color": "tab:purple", "linewidth": 0.5},
+               boxprops={"facecolor": "tab:purple", "edgecolor": "tab:purple", "linewidth": 0.5},
+               whiskerprops={"color": "tab:purple", "linewidth": 1.5},
+               capprops={"color": "tab:purple", "linewidth": 1.5}, label="Data simulated from\n" + true_model_formatted + " model")
+
+          # Mark true parameter values but skip first two plots (R^2 and Akaike weight)
+          if p not in [0, 1]:
+               axis.axhline(true_parameters[p - 2], linestyle="--", color="gray", label="True parameter value")
+               axis.text(len(colimitation_models.all_2D_trait_models) - 1, 1.02*true_parameters[p - 2], r"\textbf{True value}", va="bottom", ha="right", fontsize=colimitation_plots.axis_label_size)
+
+          # Show legend in first plot only
+          if p == 0:
+               axis.legend(loc=(0, 1.9), fontsize=colimitation_plots.axis_label_size)
+
+          # Add top tick marks for first two panels
+          if p == 0 or p == 1:
+               axis_twiny = axis.twiny()
+               axis_twiny.set_xticks(range(len(colimitation_models.all_2D_trait_models)), labels=colimitation_models.all_2D_trait_models_formatted, fontsize=colimitation_plots.tick_label_size, rotation=90)
+               axis_twiny.set_xlim([-0.5, len(colimitation_models.all_2D_trait_models) - 0.5])
+
+          # Label bottom ticks in last two plots only
+          if p == (len(ylabels) - 2) or p == (len(ylabels) - 1):
+               axis.set_xticks(range(len(colimitation_models.all_2D_trait_models)), labels=colimitation_models.all_2D_trait_models_formatted, fontsize=colimitation_plots.tick_label_size, rotation=90)
+          else:
+               axis.set_xticks(range(len(colimitation_models.all_2D_trait_models)), labels=[])
 
      figure.savefig("Figure_S29.pdf", bbox_inches="tight")
 
-#################################################################################
+################################################################################
 
 
 if __name__ == '__main__':

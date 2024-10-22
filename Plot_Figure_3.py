@@ -25,7 +25,7 @@ def main():
      dataframe = pandas.read_csv("./Data/Rate_data_fits_rep123.csv", index_col=False)
      dataframe_filtered = dataframe[dataframe["Model name"] == rate_model_to_plot]
      row_index = dataframe_filtered.index[0]
-     gmax, s1, s2, R1min, R2min = [float(x) for x in str(dataframe_filtered["Parameter values"][row_index]).split(";")]
+     gmax, a1, a2, R1min, R2min = [float(x) for x in str(dataframe_filtered["Parameter values"][row_index]).split(";")]
 
      # Iterate over points in R1-R2 space and calculate limitation coefficients and Meff
      L1_rate_mesh = numpy.zeros(R1_mesh.shape)
@@ -33,9 +33,9 @@ def main():
      Meff_rate_mesh = numpy.zeros(R1_mesh.shape)
      for i in range(len(R2_list)):
           for j in range(len(R1_list)):
-               L1_rate_mesh[i][j] = colimitation_models.CalcLimCoeff(0, [R1_list[j], R2_list[i]], [s1, s2], gmax, rate_model_to_plot.strip("_rmin"))
-               L2_rate_mesh[i][j] = colimitation_models.CalcLimCoeff(1, [R1_list[j], R2_list[i]], [s1, s2], gmax, rate_model_to_plot.strip("_rmin"))
-               Meff_rate_mesh[i][j] = colimitation_models.CalcMeff([R1_list[j], R2_list[i]], [s1, s2], gmax, rate_model_to_plot.strip("_rmin"))
+               L1_rate_mesh[i][j] = colimitation_models.CalcLimCoeff(0, [R1_list[j], R2_list[i]], [a1, a2], gmax, rate_model_to_plot.strip("_rmin"))
+               L2_rate_mesh[i][j] = colimitation_models.CalcLimCoeff(1, [R1_list[j], R2_list[i]], [a1, a2], gmax, rate_model_to_plot.strip("_rmin"))
+               Meff_rate_mesh[i][j] = colimitation_models.CalcMeff([R1_list[j], R2_list[i]], [a1, sa], gmax, rate_model_to_plot.strip("_rmin"))
 
      # Read model parameters for growth yield
      yield_model_to_plot = "pat"
@@ -91,8 +91,8 @@ def main():
           df_this_model = rate_data_indiv_reps[r][rate_data_indiv_reps[r]["Model name"] == rate_model_to_plot]
           row_index = df_this_model.index[0]
           params = [float(x) for x in str(df_this_model["Parameter values"][row_index]).split(";")]
-          gmax, s1, s2 = params[:3]
-          rate_params_indiv_reps.append([s2/s1, gmax/s1, gmax/s2])
+          gmax, a1, a2 = params[:3]
+          rate_params_indiv_reps.append([a2/a1, gmax/a1, gmax/a2])
 
      # For this model get parameters from fits to each bootstrapped data set
      for b in range(num_bootstraps):
@@ -104,8 +104,8 @@ def main():
                     params.append(numpy.nan)
                else:
                     params.append(float(x))
-          gmax, s1, s2 = params[:3]
-          rate_params_bootstraps.append([s2/s1, gmax/s1, gmax/s2])
+          gmax, a1, a2 = params[:3]
+          rate_params_bootstraps.append([a2/a1, gmax/a1, gmax/a2])
 
      # Lists for fitted parameters
      yield_params_all_reps = []
@@ -123,16 +123,16 @@ def main():
      df_this_model = yield_data_all_reps[yield_data_all_reps["Model name"] == yield_model_to_plot]
      row_index = df_this_model.index[0]
      params = [float(x) for x in str(df_this_model["Parameter values"][row_index]).split(";")]
-     gmax, s1, s2 = params[:3]
-     yield_params_all_reps = [s2/s1, gmax/s1, gmax/s2]
+     Nmax, s1, s2 = params[:3]
+     yield_params_all_reps = [s2/s1, Nmax/s1, Nmax/s2]
 
      # For this model get parameters from fits to individual replicates
      for r in range(num_replicates):
           df_this_model = yield_data_indiv_reps[r][yield_data_indiv_reps[r]["Model name"] == yield_model_to_plot]
           row_index = df_this_model.index[0]
           params = [float(x) for x in str(df_this_model["Parameter values"][row_index]).split(";")]
-          gmax, s1, s2 = params[:3]
-          yield_params_indiv_reps.append([s2/s1, gmax/s1, gmax/s2])
+          Nmax, s1, s2 = params[:3]
+          yield_params_indiv_reps.append([s2/s1, Nmax/s1, Nmax/s2])
 
      # For this model get parameters from fits to each bootstrapped data set
      for b in range(num_bootstraps):
@@ -144,8 +144,8 @@ def main():
                     params.append(numpy.nan)
                else:
                     params.append(float(x))
-          gmax, s1, s2 = params[:3]
-          yield_params_bootstraps.append([s2/s1, gmax/s1, gmax/s2])
+          Nmax, s1, s2 = params[:3]
+          yield_params_bootstraps.append([s2/s1, Nmax/s1, Nmax/s2])
 
 ################################################################################
 

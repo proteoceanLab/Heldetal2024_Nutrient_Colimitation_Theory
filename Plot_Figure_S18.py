@@ -11,7 +11,7 @@ def main():
 
      # Get true parameter values that were used for simulations
      dataframe = pandas.read_csv("./Data/Rate_data_fits_rep123.csv", index_col=False)
-     true_model = "pat_rmin"
+     true_model = "liebig_monod_rmin"
      true_model_formatted = colimitation_models.all_2D_trait_models_formatted[colimitation_models.all_2D_trait_models.index(true_model)]
      dataframe_filtered = dataframe[dataframe["Model name"] == true_model]
      row_index = dataframe_filtered.index[0]
@@ -58,13 +58,13 @@ def main():
      ylabels = [    "Quality of growth rate\nmodel fit $R^2$", 
                     "Relative Akaike weight", 
                     "Maximum growth rate\n$g_\mathrm{max}$ (per hour)",
-                    "Growth rate per\nglucose $a_\mathrm{glucose}$\n(per hour per mM glucose)",
-                    "Growth rate per\nammonium $a_\mathrm{ammonium}$\n(per hour per mM ammonium)",
-                    "Glucose-ammonium\nstoichiometry $a_\mathrm{ammonium}/a_\mathrm{glucose}$\n(mM glucose per mM ammonium)",
-                    "Glucose threshold\n$g_\mathrm{max}/a_\mathrm{glucose}$ (mM)",
-                    "Ammonium threshold\n$g_\mathrm{max}/a_\mathrm{ammonium}$ (mM)",
-                    "Minimum glucose\nconcentration $R_\mathrm{glucose,min}$ (mM)",
-                    "Minimum ammonium\nconcentration $R_\mathrm{ammonium,min}$ (mM)"]
+                    "Glucose affinity $a_\mathrm{glu}$\n(per hour per mM glucose)",
+                    "Ammonium affinity $a_\mathrm{amm}$\n(per hour per mM ammonium)",
+                    "Glucose-ammonium\nstoichiometry $a_\mathrm{amm}/a_\mathrm{glu}$\n(mM glucose per mM ammonium)",
+                    "Glucose half-saturation\nconcentration $g_\mathrm{max}/a_\mathrm{glu}$ (mM)",
+                    "Ammonium half-saturation\nconcentration $g_\mathrm{max}/a_\mathrm{amm}$ (mM)",
+                    "Minimum glucose\nconcentration $R_\mathrm{glu,min}$ (mM)",
+                    "Minimum ammonium\nconcentration $R_\mathrm{amm,min}$ (mM)"]
 
      # Axis limits for each fit parameter to plot
      ylims = [ (0, 1),

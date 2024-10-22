@@ -1,5 +1,4 @@
 import colimitation_data_analysis
-import colimitation_models
 import colimitation_plots
 from matplotlib import pyplot
 import pandas
@@ -7,87 +6,38 @@ import numpy
 from scipy import stats
 
 
-def main():    
+def main():
 
-     # Get true parameter values that were used for simulations
-     dataframe = pandas.read_csv("./Data/Yield_data_fits_rep123.csv", index_col=False)
-     true_model = "liebig_blackman"
-     true_model_formatted = colimitation_models.all_2D_trait_models_formatted[colimitation_models.all_2D_trait_models.index(true_model)]
-     dataframe_filtered = dataframe[dataframe["Model name"] == true_model]
-     row_index = dataframe_filtered.index[0]
-     zmax, s1, s2 = [float(x) for x in str(dataframe_filtered["Parameter values"][row_index]).split(";")]
-     true_parameters = [zmax, s1, s2, s2/s1, zmax/s1, zmax/s2, 0, 0]
+     # Number of replicate experiments
+     num_replicates = 3
 
-     # Number of simulated data sets
-     num_sims = 10000
+     # Number of R1 (glucose) and R2 (ammonium) values
+     num_R1_values = 11
+     num_R2_values = 7
 
-     # Lists for fitted parameters
-     fit_params_sims = [[] for s in range(num_sims)]
+     # Column labels for glucose and ammonium concentrations in data file
+     R1_label = "Glucose (mM)"
+     R2_label = "Ammonium (mM)"
 
-     # Get list of indices for models that have Rmin
-     rmin_model_indices = [i for i in range(len(colimitation_models.all_2D_trait_models)) if "rmin" in colimitation_models.all_2D_trait_models[i]]
+     # Column labels for replicate yield measurements in data file
+     yield_label_base = "Growth yield (OD 600 nm)"
+     yield_labels = [f"{yield_label_base} rep {r + 1}" for r in range(num_replicates)]
 
-     # Read fit data for simulations
-     fit_data_sim = pandas.read_csv(f"./Data/Yield_sim_{true_model}_fits.csv", index_col=False)
+     # Read R1, R2, and yield data into 2D meshes
+     skiprows = 11
+     sheet_name = "Table 1 Growth yields"
+     R1_mesh, R2_mesh, yield_mesh = colimitation_data_analysis.Read2DScan("./Data/Dataset_S2.xlsx", R1_label, R2_label, yield_labels, num_R1_values, num_R2_values, sheet_name=sheet_name, skiprows=skiprows) 
 
-     # Get parameters from fits to each simulated data set
-     for s in range(num_sims):
-
-          # Iterate over all fitted models
-          for model_name in colimitation_models.all_2D_trait_models:
-
-               df_this_model = fit_data_sim[fit_data_sim["Model name"] == model_name]
-               row_index = df_this_model.index[0]
-               Rsq = float(df_this_model[f"R^2 sim {s + 1}"])
-               akaike_weight = float(df_this_model[f"Akaike weight sim {s + 1}"])
-               params = []
-               for x in str(df_this_model[f"Parameter values sim {s + 1}"][row_index]).split(";"):
-                    if x == "NA":
-                         params.append(numpy.nan)
-                    else:
-                         params.append(float(x))
-               zmax, s1, s2 = params[:3]
-               if "rmin" not in model_name:
-                    fit_data = [Rsq, akaike_weight, zmax, s1, s2, s2/s1, zmax/s1, zmax/s2]
-               else:      
-                    R1min, R2min = params[-2:]
-                    fit_data = [Rsq, akaike_weight, zmax, s1, s2, s2/s1, zmax/s1, zmax/s2, R1min, R2min]
-               fit_params_sims[s].append(fit_data)
-
-     # Axis labels for each fit parameter to plot
-     ylabels = [    "Quality of growth yield\nmodel fit $R^2$", 
-                    "Relative Akaike weight", 
-                    "Maximum growth yield\n$N_\mathrm{max}$ (OD 600 nm)",
-                    "Growth yield per\nglucose $a_\mathrm{glucose}$\n(OD 600 nm per mM glucose)",
-                    "Growth yield per\nammonium $a_\mathrm{ammonium}$\n(OD 600 nm per mM ammonium)",
-                    "Glucose-ammonium\nstoichiometry $a_\mathrm{ammonium}/a_\mathrm{glucose}$\n(mM glucose per mM ammonium)",
-                    "Glucose threshold\n$N_\mathrm{max}/a_\mathrm{glucose}$ (mM)",
-                    "Ammonium threshold\n$N_\mathrm{max}/a_\mathrm{ammonium}$ (mM)",
-                    "Minimum glucose\nconcentration $R_\mathrm{glucose,min}$ (mM)",
-                    "Minimum ammonium\nconcentration $R_\mathrm{ammonium,min}$ (mM)"]
-
-     # Axis limits for each fit parameter to plot
-     ylims = [ (0.9, 1),
-               (10**(-12), 10**(0)),
-               (0.4, 0.8),
-               (0, 0.4),
-               (0, 0.7),
-               (0.5, 2.5),
-               (1, 13),
-               (0, 6),
-               (0, 0.1),
-               (0, 0.1)]
-
-     # Perform Mann-Whitney U test to compare R^2 distributions from the simulated
-     # data sets
-     print("p-values for Mann-Whitney U test between simulated R^2 distributions")
-     ref_model_index = 0
-     for m in range(len(colimitation_models.all_2D_trait_models)):
-          if m == ref_model_index: continue
-          Rsq1 = [fit_params_sims[s][ref_model_index][0] for s in range(num_sims) if not numpy.isnan(fit_params_sims[s][ref_model_index][0])]
-          Rsq2 = [fit_params_sims[s][m][0] for s in range(num_sims) if not numpy.isnan(fit_params_sims[s][m][0])]
-          result = stats.mannwhitneyu(Rsq1, Rsq2)
-          print("\t", colimitation_models.all_2D_trait_models[ref_model_index], "vs.", colimitation_models.all_2D_trait_models[m], "p =", result.pvalue)
+     # Calculate linear dependence of standard deviation of yield with mean yield
+     means = []     
+     sds = []
+     for i in range(len(yield_mesh)):
+          for j in range(len(yield_mesh[i])):
+               entries = [x for x in yield_mesh[i][j] if not isinstance(x, str)]
+               if len(entries) > 0:
+                    sds.append(numpy.std(entries))
+                    means.append(numpy.mean(entries))
+     result = stats.linregress(means, sds)
 
 ################################################################################
 
@@ -95,57 +45,19 @@ def main():
      pyplot.rcParams = colimitation_plots.SetrcParams(pyplot.rcParams)
 
      # Initialize figure
-     figure = pyplot.figure(figsize=(18, 3*len(ylabels)/2))
-     figure.subplots_adjust(hspace=0.1, wspace=0.15)
-
-     # Iterate over each fit parameter to plot
-     for p in range(len(ylabels)):
-
-          # Set up axis
-          axis = figure.add_subplot(int(len(ylabels)/2), 2, p + 1)
-          axis.set_ylabel(ylabels[p], fontsize=colimitation_plots.axis_label_size)
-          axis.set_xlim([-0.5, len(colimitation_models.all_2D_trait_models) - 0.5])
-          axis.set_ylim(ylims[p])
-          if "Akaike" in ylabels[p]:
-               axis.set_yscale("log")
-          for i in range(len(colimitation_models.all_2D_trait_models)):
-               axis.axvline(i, linestyle="--", linewidth=0.25, color="0.8", zorder=-1)
-
-          # If the parameter to plot is Rmin, use only a subset of model indices
-          # for Rmin models
-          if "Minimum" in ylabels[p]:
-               model_indices = rmin_model_indices
-          else:
-               model_indices = range(len(colimitation_models.all_2D_trait_models))
+     figure = pyplot.figure(figsize=(4, 3))
+     figure.subplots_adjust(hspace=0.05)
      
-          # Plot fit parameters for simulated data
-          params_sims = [[fit_params_sims[s][i][p] for s in range(num_sims) if not numpy.isnan(fit_params_sims[s][i][p])] for i in model_indices]
-          boxes = axis.boxplot(params_sims, positions=model_indices, sym="", patch_artist=True, zorder=0, 
-               medianprops={"color": "tab:purple", "linewidth": 0.5},
-               boxprops={"facecolor": "tab:purple", "edgecolor": "tab:purple", "linewidth": 0.5},
-               whiskerprops={"color": "tab:purple", "linewidth": 1.5},
-               capprops={"color": "tab:purple", "linewidth": 1.5}, label="Data simulated from\n" + true_model_formatted + " model")
-
-          # Mark true parameter values but skip first two plots (R^2 and Akaike weight)
-          if p not in [0, 1]:
-               axis.axhline(true_parameters[p - 2], linestyle="--", color="gray", label="True parameter value")
-               axis.text(len(colimitation_models.all_2D_trait_models) - 1, 1.02*true_parameters[p - 2], r"\textbf{True value}", va="bottom", ha="right", fontsize=colimitation_plots.axis_label_size)
-
-          # Show legend in first plot only
-          if p == 0:
-               axis.legend(loc=(0, 1.9), fontsize=colimitation_plots.axis_label_size)
-
-          # Add top tick marks for first two panels
-          if p == 0 or p == 1:
-               axis_twiny = axis.twiny()
-               axis_twiny.set_xticks(range(len(colimitation_models.all_2D_trait_models)), labels=colimitation_models.all_2D_trait_models_formatted, fontsize=colimitation_plots.tick_label_size, rotation=90)
-               axis_twiny.set_xlim([-0.5, len(colimitation_models.all_2D_trait_models) - 0.5])
-
-          # Label bottom ticks in last two plots only
-          if p == (len(ylabels) - 2) or p == (len(ylabels) - 1):
-               axis.set_xticks(range(len(colimitation_models.all_2D_trait_models)), labels=colimitation_models.all_2D_trait_models_formatted, fontsize=colimitation_plots.tick_label_size, rotation=90)
-          else:
-               axis.set_xticks(range(len(colimitation_models.all_2D_trait_models)), labels=[])
+     # Plot means vs. standard deviations
+     axis = figure.add_subplot(1, 1, 1)
+     axis.set_xlabel("Mean growth yield across replicates (OD 600 nm)", fontsize=colimitation_plots.axis_label_size)
+     axis.set_ylabel("Standard deviation of growth\nyield across replicates (OD 600 nm)", fontsize=colimitation_plots.axis_label_size)
+     axis.set_xlim([0, 0.6])
+     axis.set_ylim([0, 0.014])
+     axis.scatter(means, sds, label="Data")
+     axis.plot([min(means), max(means)], [result.intercept + result.slope*min(means), result.intercept + result.slope*max(means)], "--", color="red", 
+          label="Linear regression" + "\n" + r"Slope $\approx$ " + str(round(result.slope, 3)) + "\n" + r"Intercept $\approx$ " + str(round(result.intercept, 3)) + " OD\n" + r"$p$-value $\approx 6\times 10^{-7}$")
+     axis.legend(loc="best", fontsize=colimitation_plots.legend_label_size)
 
      figure.savefig("Figure_S26.pdf", bbox_inches="tight")
 
