@@ -38,8 +38,8 @@ all_2D_trait_models = [  "liebig_monod",
                          "additive_rmin",
                          "mankad_bungay",                        
                          "mankad_bungay_rmin",
-                         "generalized_mean",
-                         "generalized_mean_rmin",
+                         "generalized_additive",
+                         "generalized_additive_rmin",
                          "saito_sub",
                          "saito_sub_rmin",                       
                          "mean_monod_sub",                      
@@ -51,10 +51,10 @@ all_2D_trait_models = [  "liebig_monod",
 all_2D_trait_models_formatted = [" ".join(word.capitalize() for word in model.split("_")).replace("Pat", "PAT") for model in all_2D_trait_models]
 
 
-def CalcTraitODE(Rs, ss, zmax, model):
+def CalcTraitODE(Rs, cs, zmax, model):
      """
      Rs: List of resource concentrations
-     ss: List of stoichiometry coefficients
+     cs: List of coefficients
      zmax: Maximum trait value
      model: Name of trait model to use
 
@@ -66,11 +66,11 @@ def CalcTraitODE(Rs, ss, zmax, model):
 
      # Standardized parameters
      Rs = numpy.array(Rs)
-     ss = numpy.array(ss)
+     cs = numpy.array(cs)
      model = model.lower()
 
      # Set dimensionless resource concentrations
-     rs = ss*Rs/zmax
+     rs = cs*Rs/zmax
 
      # Pre-factor to ensure traits are always zero (for essential independent 
      # resource models) if any resource concentration drops below zero
@@ -136,7 +136,7 @@ def CalcTraitForFit(Rs, params, model):
      model = model.lower()
 
      # Small number to test for avoiding divisions by zero
-     epsilon = 1e-10
+     epsilon = 1e-6
 
      # Ignore runtime warnings for this function since they often result from
      # divide by zeros
@@ -152,36 +152,36 @@ def CalcTraitForFit(Rs, params, model):
                R, = Rs
      
                if model == "monod":
-                    zmax, s = params
-                    return zmax*s*R/(s*R + zmax)
+                    zmax, c = params
+                    return zmax*c*R/(c*R + zmax)
      
                elif model == "monod_rmin":
-                    zmax, s, Rmin = params
-                    return CalcTraitForFit([R + Rmin], [zmax, s], "monod")
+                    zmax, c, Rmin = params
+                    return CalcTraitForFit([R + Rmin], [zmax, c], "monod")
      
                elif model == "hill":
-                    zmax, s, n = params
-                    return zmax*(s*R)**n/((s*R)**n + zmax**n)
+                    zmax, c, n = params
+                    return zmax*(c*R)**n/((c*R)**n + zmax**n)
      
                elif model == "hill_rmin":
-                    zmax, s, n, Rmin = params
-                    return CalcTraitForFit([R + Rmin], [zmax, s, n], "hill")
+                    zmax, c, n, Rmin = params
+                    return CalcTraitForFit([R + Rmin], [zmax, c, n], "hill")
      
                elif model == "blackman":
-                    zmax, s = params
-                    return numpy.minimum(s*R, zmax)
+                    zmax, c = params
+                    return numpy.minimum(c*R, zmax)
      
                elif model == "blackman_rmin":
-                    zmax, s, Rmin = params
-                    return CalcTraitForFit([R + Rmin], [zmax, s], "blackman")
+                    zmax, c, Rmin = params
+                    return CalcTraitForFit([R + Rmin], [zmax, c], "blackman")
      
                elif model == "bertalanffy":
-                    zmax, s = params
-                    return zmax*(1 - 2**(-s*R/zmax))
+                    zmax, c = params
+                    return zmax*(1 - 2**(-c*R/zmax))
      
                elif model == "bertalanffy_rmin":
-                    zmax, s, Rmin = params
-                    return CalcTraitForFit([R + Rmin], [zmax, s], "bertalanffy")
+                    zmax, c, Rmin = params
+                    return CalcTraitForFit([R + Rmin], [zmax, c], "bertalanffy")
      
                else:
                     raise ValueError("Unknown 1D trait model")
@@ -192,152 +192,152 @@ def CalcTraitForFit(Rs, params, model):
      
                # Liebig models
                if model == "liebig_monod":
-                    zmax, s1, s2 = params
-                    z1 = CalcTraitForFit([R1], [zmax, s1], "monod")
-                    z2 = CalcTraitForFit([R2], [zmax, s2], "monod")
+                    zmax, c1, c2 = params
+                    z1 = CalcTraitForFit([R1], [zmax, c1], "monod")
+                    z2 = CalcTraitForFit([R2], [zmax, c2], "monod")
                     return numpy.minimum(z1, z2)
      
                elif model == "liebig_monod_rmin":
-                    zmax, s1, s2, R1min, R2min = params
-                    return CalcTraitForFit([R1 + R1min, R2 + R2min], [zmax, s1, s2], "liebig_monod")
+                    zmax, c1, c2, R1min, R2min = params
+                    return CalcTraitForFit([R1 + R1min, R2 + R2min], [zmax, c1, c2], "liebig_monod")
      
                elif model == "liebig_hill":
-                    zmax, s1, s2, n1, n2 = params
-                    z1 = CalcTraitForFit([R1], [zmax, s1, n1], "hill")
-                    z2 = CalcTraitForFit([R2], [zmax, s2, n2], "hill")
+                    zmax, c1, c2, n1, n2 = params
+                    z1 = CalcTraitForFit([R1], [zmax, c1, n1], "hill")
+                    z2 = CalcTraitForFit([R2], [zmax, c2, n2], "hill")
                     return numpy.minimum(z1, z2)
      
                elif model == "liebig_hill_rmin":
-                    zmax, s1, s2, n1, n2, R1min, R2min = params
-                    return CalcTraitForFit([R1 + R1min, R2 + R2min], [zmax, s1, s2, n1, n2], "liebig_hill")
+                    zmax, c1, c2, n1, n2, R1min, R2min = params
+                    return CalcTraitForFit([R1 + R1min, R2 + R2min], [zmax, c1, c2, n1, n2], "liebig_hill")
      
                elif model == "liebig_blackman":
-                    zmax, s1, s2 = params
-                    z1 = CalcTraitForFit([R1], [zmax, s1], "blackman")
-                    z2 = CalcTraitForFit([R2], [zmax, s2], "blackman")
+                    zmax, c1, c2 = params
+                    z1 = CalcTraitForFit([R1], [zmax, c1], "blackman")
+                    z2 = CalcTraitForFit([R2], [zmax, c2], "blackman")
                     return numpy.minimum(z1, z2)
      
                elif model == "liebig_blackman_rmin":
-                    zmax, s1, s2, R1min, R2min = params
-                    return CalcTraitForFit([R1 + R1min, R2 + R2min], [zmax, s1, s2], "liebig_blackman")
+                    zmax, c1, c2, R1min, R2min = params
+                    return CalcTraitForFit([R1 + R1min, R2 + R2min], [zmax, c1, c2], "liebig_blackman")
      
                elif model == "liebig_bertalanffy":
-                    zmax, s1, s2 = params
-                    z1 = CalcTraitForFit([R1], [zmax, s1], "bertalanffy")
-                    z2 = CalcTraitForFit([R2], [zmax, s2], "bertalanffy")
+                    zmax, c1, c2 = params
+                    z1 = CalcTraitForFit([R1], [zmax, c1], "bertalanffy")
+                    z2 = CalcTraitForFit([R2], [zmax, c2], "bertalanffy")
                     return numpy.minimum(z1, z2)
      
                elif model == "liebig_bertalanffy_rmin":
-                    zmax, s1, s2, R1min, R2min = params
-                    return CalcTraitForFit([R1 + R1min, R2 + R2min], [zmax, s1, s2], "liebig_bertalanffy")
+                    zmax, c1, c2, R1min, R2min = params
+                    return CalcTraitForFit([R1 + R1min, R2 + R2min], [zmax, c1, c2], "liebig_bertalanffy")
      
                # Multiplicative models
                elif model == "multiplicative_monod":
-                    zmax, s1, s2 = params
-                    z1 = CalcTraitForFit([R1], [zmax, s1], "monod")
-                    z2 = CalcTraitForFit([R2], [zmax, s2], "monod")
+                    zmax, c1, c2 = params
+                    z1 = CalcTraitForFit([R1], [zmax, c1], "monod")
+                    z2 = CalcTraitForFit([R2], [zmax, c2], "monod")
                     return z1*z2/zmax
      
                elif model == "multiplicative_monod_rmin":
-                    zmax, s1, s2, R1min, R2min = params
-                    return CalcTraitForFit([R1 + R1min, R2 + R2min], [zmax, s1, s2], "multiplicative_monod")
+                    zmax, c1, c2, R1min, R2min = params
+                    return CalcTraitForFit([R1 + R1min, R2 + R2min], [zmax, c1, c2], "multiplicative_monod")
      
                elif model == "multiplicative_hill":
-                    zmax, s1, s2, n1, n2 = params
-                    z1 = CalcTraitForFit([R1], [zmax, s1, n1], "hill")
-                    z2 = CalcTraitForFit([R2], [zmax, s2, n2], "hill")
+                    zmax, c1, c2, n1, n2 = params
+                    z1 = CalcTraitForFit([R1], [zmax, c1, n1], "hill")
+                    z2 = CalcTraitForFit([R2], [zmax, c2, n2], "hill")
                     return z1*z2/zmax
      
                elif model == "multiplicative_hill_rmin":
-                    zmax, s1, s2, n1, n2, R1min, R2min = params
-                    return CalcTraitForFit([R1 + R1min, R2 + R2min], [zmax, s1, s2, n1, n2], "multiplicative_hill")
+                    zmax, c1, c2, n1, n2, R1min, R2min = params
+                    return CalcTraitForFit([R1 + R1min, R2 + R2min], [zmax, c1, c2, n1, n2], "multiplicative_hill")
      
                elif model == "multiplicative_blackman":
-                    zmax, s1, s2 = params
-                    z1 = CalcTraitForFit([R1], [zmax, s1], "blackman")
-                    z2 = CalcTraitForFit([R2], [zmax, s2], "blackman")
+                    zmax, c1, c2 = params
+                    z1 = CalcTraitForFit([R1], [zmax, c1], "blackman")
+                    z2 = CalcTraitForFit([R2], [zmax, c2], "blackman")
                     return z1*z2/zmax
      
                elif model == "multiplicative_blackman_rmin":
-                    zmax, s1, s2, R1min, R2min = params
-                    return CalcTraitForFit([R1 + R1min, R2 + R2min], [zmax, s1, s2], "multiplicative_blackman")
+                    zmax, c1, c2, R1min, R2min = params
+                    return CalcTraitForFit([R1 + R1min, R2 + R2min], [zmax, c1, c2], "multiplicative_blackman")
      
                elif model == "multiplicative_bertalanffy":
-                    zmax, s1, s2 = params
-                    z1 = CalcTraitForFit([R1], [zmax, s1], "bertalanffy")
-                    z2 = CalcTraitForFit([R2], [zmax, s2], "bertalanffy")
+                    zmax, c1, c2 = params
+                    z1 = CalcTraitForFit([R1], [zmax, c1], "bertalanffy")
+                    z2 = CalcTraitForFit([R2], [zmax, c2], "bertalanffy")
                     return z1*z2/zmax
      
                elif model == "multiplicative_bertalanffy_rmin":
-                    zmax, s1, s2, R1min, R2min = params
-                    return CalcTraitForFit([R1 + R1min, R2 + R2min], [zmax, s1, s2], "multiplicative_bertalanffy")
+                    zmax, c1, c2, R1min, R2min = params
+                    return CalcTraitForFit([R1 + R1min, R2 + R2min], [zmax, c1, c2], "multiplicative_bertalanffy")
      
                # PAT, additive, and Mankad-Bungay models
                elif model == "pat":
-                    zmax, s1, s2 = params
-                    denominator = numpy.array((s1*R1)*(s2*R2)*(s1*R1 + s2*R2) + zmax*((s1*R1)**2 + (s1*R1)*(s2*R2) + (s2*R2)**2))
+                    zmax, c1, c2 = params
+                    denominator = numpy.array((c1*R1)*(c2*R2)*(c1*R1 + c2*R2) + zmax*((c1*R1)**2 + (c1*R1)*(c2*R2) + (c2*R2)**2))
                     # Mask denominator values below a small number to avoid division by zero; this doesn't change function values because these points must be zero anyway
                     denominator[denominator < epsilon] = epsilon
-                    return zmax*(s1*R1)*(s2*R2)*(s1*R1 + s2*R2)/denominator
+                    return zmax*(c1*R1)*(c2*R2)*(c1*R1 + c2*R2)/denominator
      
                elif model == "pat_rmin":
-                    zmax, s1, s2, R1min, R2min = params
-                    return CalcTraitForFit([R1 + R1min, R2 + R2min], [zmax, s1, s2], "pat")
+                    zmax, c1, c2, R1min, R2min = params
+                    return CalcTraitForFit([R1 + R1min, R2 + R2min], [zmax, c1, c2], "pat")
      
                elif model == "additive":
-                    zmax, s1, s2 = params
-                    denominator = numpy.array((s1*R1)*(s2*R2) + zmax*(s1*R1 + s2*R2))
+                    zmax, c1, c2 = params
+                    denominator = numpy.array((c1*R1)*(c2*R2) + zmax*(c1*R1 + c2*R2))
                     # Mask denominator values below a small number to avoid division by zero; this doesn't change function values because these points must be zero anyway
                     denominator[denominator < epsilon] = epsilon
-                    return zmax*(s1*R1)*(s2*R2)/denominator
+                    return zmax*(c1*R1)*(c2*R2)/denominator
      
                elif model == "additive_rmin":
-                    zmax, s1, s2, R1min, R2min = params
-                    return CalcTraitForFit([R1 + R1min, R2 + R2min], [zmax, s1, s2], "additive")
-     
+                    zmax, c1, c2, R1min, R2min = params
+                    return CalcTraitForFit([R1 + R1min, R2 + R2min], [zmax, c1, c2], "additive")
+
                elif model == "mankad_bungay":
-                    zmax, s1, s2 = params
-                    denominator = numpy.array(s1*R1 + s2*R2)
+                    zmax, c1, c2 = params
+                    denominator = numpy.array(c1*R1 + c2*R2)
                     # Mask denominator values below a small number to avoid division by zero; this doesn't change function values because these points must be zero anyway
                     denominator[denominator < epsilon] = epsilon
-                    return zmax*((s1*R1)*(s2*R2)/denominator)*(1/(s1*R1 + zmax) + 1/(s2*R2 + zmax))
+                    return zmax*((c1*R1)*(c2*R2)/denominator)*(1/(c1*R1 + zmax) + 1/(c2*R2 + zmax))
      
                elif model == "mankad_bungay_rmin":
-                    zmax, s1, s2, R1min, R2min = params
-                    return CalcTraitForFit([R1 + R1min, R2 + R2min], [zmax, s1, s2], "mankad_bungay")
+                    zmax, c1, c2, R1min, R2min = params
+                    return CalcTraitForFit([R1 + R1min, R2 + R2min], [zmax, c1, c2], "mankad_bungay")
      
-               elif model == "generalized_mean":
-                    zmax, s1, s2, q = params
-                    return ((s1*R1)**(-q) + (s2*R2)**(-q) + zmax**(-q))**(1/(-q))
+               elif model == "generalized_additive":
+                    zmax, c1, c2, q = params
+                    return ((c1*R1)**(-q) + (c2*R2)**(-q) + zmax**(-q))**(1/(-q))
      
-               elif model == "generalized_mean_rmin":
-                    zmax, s1, s2, q, R1min, R2min = params
-                    return CalcTraitForFit([R1 + R1min, R2 + R2min], [zmax, s1, s2, q], "generalized_mean")
-     
+               elif model == "generalized_additive_rmin":
+                    zmax, c1, c2, q, R1min, R2min = params
+                    return CalcTraitForFit([R1 + R1min, R2 + R2min], [zmax, c1, c2, q], "generalized_additive")
+
                # Models for substitutable and chemically-dependent resources
                elif model == "saito_sub":
-                    zmax, s1, s2 = params
-                    return zmax*(s1*R1 + s2*R2)/(s1*R1 + s2*R2 + zmax)
+                    zmax, c1, c2 = params
+                    return zmax*(c1*R1 + c2*R2)/(c1*R1 + c2*R2 + zmax)
      
                elif model == "saito_sub_rmin":
-                    zmax, s1, s2, R1min, R2min = params
-                    return CalcTraitForFit([R1 + R1min, R2 + R2min], [zmax, s1, s2], "saito_sub")
+                    zmax, c1, c2, R1min, R2min = params
+                    return CalcTraitForFit([R1 + R1min, R2 + R2min], [zmax, c1, c2], "saito_sub")
      
                elif model == "mean_monod_sub":
-                    zmax, s1, s2 = params
-                    return zmax*0.5*(s1*R1/(s1*R1 + zmax) + s2*R2/(s2*R2 + zmax))
+                    zmax, c1, c2 = params
+                    return zmax*0.5*(c1*R1/(c1*R1 + zmax) + c2*R2/(c2*R2 + zmax))
      
                elif model == "mean_monod_sub_rmin":
-                    zmax, s1, s2, R1min, R2min = params
-                    return CalcTraitForFit([R1 + R1min, R2 + R2min], [zmax, s1, s2], "mean_monod_sub")
+                    zmax, c1, c2, R1min, R2min = params
+                    return CalcTraitForFit([R1 + R1min, R2 + R2min], [zmax, c1, c2], "mean_monod_sub")
      
                elif model == "chem_depend":
-                    zmax, s1, s2 = params
-                    return zmax*(s1*R1)*(s2*R2)/((s1*R1)*(s2*R2) + zmax*(s2*R2 + zmax))
+                    zmax, c1, c2 = params
+                    return zmax*(c1*R1)*(c2*R2)/((c1*R1)*(c2*R2) + zmax*(c2*R2 + zmax))
      
                elif model == "chem_depend_rmin":
-                    zmax, s1, s2, R1min, R2min = params
-                    return CalcTraitForFit([R1 + R1min, R2 + R2min], [zmax, s1, s2], "chem_depend")
+                    zmax, c1, c2, R1min, R2min = params
+                    return CalcTraitForFit([R1 + R1min, R2 + R2min], [zmax, c1, c2], "chem_depend")
      
                else:
                     raise ValueError("Unknown 2D trait model: " + model)
@@ -347,11 +347,11 @@ def CalcTraitForFit(Rs, params, model):
                raise ValueError("Too many resources for trait model")
 
 
-def CalcLimCoeff(resource_index, Rs, ss, zmax, model):
+def CalcLimCoeff(resource_index, Rs, cs, zmax, model):
      """
      resource_index: Index of resource for which to calculate limitation coefficient
      Rs: List of resource concentrations
-     ss: List of stoichiometry coefficients
+     cs: List of coefficients
      zmax: Maximum trait value
      model: Name of trait model to use
 
@@ -360,11 +360,11 @@ def CalcLimCoeff(resource_index, Rs, ss, zmax, model):
 
      # Standardized parameters
      Rs = numpy.array(Rs)
-     ss = numpy.array(ss)
+     cs = numpy.array(cs)
      model = model.lower()
 
      # Set dimensionless resource concentrations
-     rs = ss*Rs/zmax
+     rs = cs*Rs/zmax
 
      # If any concentrations are negative (from integrating ODEs), then assume
      # the real concentrations are zero.  For all models except multiplicative,
@@ -427,11 +427,11 @@ def CalcLimCoeff(resource_index, Rs, ss, zmax, model):
           raise ValueError("Unknown growth rate model")
 
 
-def CalcLimCoeffGM(resource_index, Rs, ss, q):
+def CalcLimCoeffGM(resource_index, Rs, cs, q):
      """
      resource_index: Index of resource for which to calculate limitation coefficient
      Rs: List of resource concentrations
-     ss: List of stoichiometry coefficients
+     cs: List of coefficients
      q: Interaction parameter
 
      return: Limitation coefficient specifically for generalized mean model 
@@ -439,17 +439,17 @@ def CalcLimCoeffGM(resource_index, Rs, ss, q):
      """
 
      Rs = numpy.array(Rs)
-     ss = numpy.array(ss)
+     cs = numpy.array(cs)
 
-     rs = ss*Rs
+     rs = cs*Rs
 
      return (rs[resource_index])**(-q)/sum(rs**(-q))
 
 
-def CalcMeff(Rs, ss, zmax, model):
+def CalcMeff(Rs, cs, zmax, model):
      """
      Rs: List of resource concentrations
-     ss: List of stoichiometry coefficients
+     cs: List of coefficients
      zmax: Maximum trait value
      model: Name of trait model to use
 
@@ -460,7 +460,7 @@ def CalcMeff(Rs, ss, zmax, model):
      model = model.lower()
 
      # Calculate list of all limitation coefficients for explicit resources
-     Lis = [CalcLimCoeff(i, Rs, ss, zmax, model) for i in range(len(Rs))]
+     Lis = [CalcLimCoeff(i, Rs, cs, zmax, model) for i in range(len(Rs))]
 
      # Add limitation coefficient for implicit resource
      Lis.append(1 - sum(Lis))
@@ -468,10 +468,10 @@ def CalcMeff(Rs, ss, zmax, model):
      return 1/numpy.max(numpy.array(Lis))
 
 
-def CalcMeffGM(Rs, ss, q):
+def CalcMeffGM(Rs, cs, q):
      """
      Rs: List of resource concentrations
-     ss: List of stoichiometry coefficients
+     cs: List of coefficients
      q: Interaction parameter
 
      return: Number of effectively limiting resources specifically for generalized mean model
@@ -479,80 +479,53 @@ def CalcMeffGM(Rs, ss, q):
      """
 
      # Calculate list of all limitation coefficients for explicit resources
-     Lis = [CalcLimCoeffGM(i, Rs, ss, q) for i in range(len(Rs))]
+     Lis = [CalcLimCoeffGM(i, Rs, cs, q) for i in range(len(Rs))]
 
      return 1/numpy.max(numpy.array(Lis))
 
 
-def CalcSerialTransferSteadyState(Rsources, Ys, D):
-     """
-     Rsources: List of source concentrations for all resources
-     Ys: List of intrinsic yields (same length as Rsources)
-     D: Dilution factor (> 1)
-
-     return: Initial concentrations of biomass and all resources in steady-state
-          of serial transfers
-     """
-
-     # Standardized parameters
-     Rsources = numpy.array(Rsources)
-     Ys = numpy.array(Ys)
-
-     # Identify the yield-limiting resource
-     yield_limiting_resource = numpy.argmin(Rsources*Ys)
-
-     # Calculate the biomass at the beginning of each cycle
-     N0 = Rsources[yield_limiting_resource]*Ys[yield_limiting_resource]/(D - 1)
-     N0s = numpy.array([N0])
-
-     # Calculate the resource concentrations at the beginning of each cycle
-     R0s = (D - Rsources[yield_limiting_resource]*Ys[yield_limiting_resource]/(Rsources*Ys))*Rsources/(D - 1)
-
-     return N0s, R0s
-
-
-def CalcRStarAdditiveModel(gmax, K1, K2, d, R1initial, R2initial, Y1, Y2):
+def CalcRStarAdditiveModel(gmax, a1, a2, d, R1source, R2source, s1, s2):
      """
      gmax: Maximum growth rate in additive model
-     K1, K2: Half-saturation concentrations in additive model
+     a1, a2: Specific affinities in additive model
      d: Death rate or minimum growth rate
-     R1initial, R2initial: Initial concentrations of resources
-     Y1, Y2: Yields of resources
+     R1source, R2source: Source concentrations of resources
+     s1, s2: Biomass stoichiometries of resources
 
      return: Rstar values for resource 1 and resource 2
      """
 
      # Define dimensionless quantities
      gamma = gmax/d
-     r1initial = R1initial/K1
-     r2initial = R2initial/K2
-     y1 = K1*Y1
-     y2 = K2*Y2
-     D = y1**2*(1 + r1initial*(r1initial*(gamma - 1) - 2)*(gamma - 1)) + y2**2*(1 + r2initial*(r2initial*(gamma - 1) - 2)*(gamma - 1)) + 2*y1*y2*(1 - r1initial - r2initial - r1initial*r2initial + (r1initial + r2initial + 2*r1initial*r2initial)*gamma - r1initial*r2initial*gamma**2)
+     r1 = R1source*a1/gmax
+     r2 = R2source*a2/gmax
+     y1 = s1*gmax/a1
+     y2 = s2*gmax/a2
+     D = y1**2*(1 + r1*(r1*(gamma - 1) - 2)*(gamma - 1)) + y2**2*(1 + r2*(r2*(gamma - 1) - 2)*(gamma - 1)) + 2*y1*y2*(1 - r1 - r2 - r1*r2 + (r1 + r2 + 2*r1*r2)*gamma - r1*r2*gamma**2)
 
      # Calculate Rstar values
-     R1star = (y1 + y2 + (gamma - 1)*(y1*r1initial - y2*r2initial) + numpy.sqrt(D))*K1/(2*y1*(gamma - 1))
-     R2star = (y1 + y2 + (gamma - 1)*(y2*r2initial - y1*r1initial) + numpy.sqrt(D))*K2/(2*y2*(gamma - 1))
+     R1star = (y1 + y2 + (gamma - 1)*(y1*r1 - y2*r2) + numpy.sqrt(D))*(gmax/a1)/(2*y1*(gamma - 1))
+     R2star = (y1 + y2 + (gamma - 1)*(y2*r2 - y1*r1) + numpy.sqrt(D))*(gmax/a2)/(2*y2*(gamma - 1))
 
      return R1star, R2star
 
 
-def CalcYieldChemostatAdditiveModel(gmax, K1, K2, d, R1initial, R2initial, Y1, Y2):
+def CalcYieldChemostatAdditiveModel(gmax, a1, a2, d, R1source, R2source, s1, s2):
      """
      gmax: Maximum growth rate in additive model
-     K1, K2: Half-saturation concentrations in additive model
+     a1, a2: Specific affinities in additive model
      d: Death rate or minimum growth rate
-     R1initial, R2initial: Initial concentrations of resources
-     Y1, Y2: Yields of resources
+     R1source, R2source: Source concentrations of resources
+     s1, s2: Biomass stoichiometries of resources
 
      return: Total biomass yield
      """
 
      # Calculate Rstar
-     R1star, R2star = CalcRStarAdditiveModel(gmax, K1, K2, d, R1initial, R2initial, Y1, Y2)
+     R1star, R2star = CalcRStarAdditiveModel(gmax, a1, a2, d, R1source, R2source, s1, s2)
 
      # Calculate total yield
-     dN = (R1initial - R1star)*Y1
+     dN = (R1source - R1star)*s1
 
      return dN
 
@@ -588,12 +561,12 @@ def CalcResourceDepletionPhaseLine(dR2dR1, params, R1max):
      return phase_line
 
 
-def CalcYieldVariableStoichiometry(R1, R2, Y1_function, Y2_function, phase_line, params):
+def CalcYieldVariableStoichiometry(R1, R2, s1_function, s2_function, phase_line, params):
      """
      R1: Concentration of resource 1
      R2: Concentration of resource 2
-     Y1_function: Function of intrinsic yield Y1, call signature should be Y1_function(R1, R2, other parameters)
-     Y2_function: Function of intrinsic yield Y2, call signature should be Y2_function(R1, R2, other parameters)
+     s1_function: Biomass stoichiometry s1, call signature should be s1_function(R1, R2, other parameters)
+     s2_function: Biomass stoichiometry s2, call signature should be s2_function(R1, R2, other parameters)
      phase_line: R2 as a function of R1 that separates Omega_1 from Omega_2
      params: Other parameters in model
 
@@ -612,32 +585,32 @@ def CalcYieldVariableStoichiometry(R1, R2, Y1_function, Y2_function, phase_line,
      if R2 > phase_line(R1):
 
           # Define stoichiometry function for ODE
-          dR2dR1 = lambda R1, R2, *params: Y1_function(R1, R2, *params)/Y2_function(R1, R2, *params)
+          dR2dR1 = lambda R1, R2, *params: s1_function(R1, R2, *params)/s2_function(R1, R2, *params)
 
           # Integrate ODE along R1 axis
           R1_trajectory = numpy.linspace(R1, R1min, num_points)
-          solution = integrate.solve_ivp(dR2dR1, (R1, R1min), [R2], t_eval=R1_trajectory, args=params)
+          solution = integrate.solve_ivp(dR2dR1, (R1, R1min), [R2], t_eval=R1_trajectory, args=params) #, dense_output=True)
           R2_trajectory = solution.y[0]
           R2_trajectory_interpolated = interpolate.interp1d(R1_trajectory, R2_trajectory, kind="cubic")
-          Y1_function_wrapper = lambda R1: Y1_function(R1, R2_trajectory_interpolated(R1), *params)
+          s1_function_wrapper = lambda R1: s1_function(R1, R2_trajectory_interpolated(R1), *params)
 
           # Now integrate intrinsic yield along the resource depletion trajectory to calculate total yield
-          dN = integrate.quad(Y1_function_wrapper, R1min, R1)[0]
+          N = integrate.quad(s1_function_wrapper, R1min, R1)[0]
 
      # Otherwise, this point is in Omega_2
      else:
 
           # Define stoichiometry function for ODE
-          dR1dR2 = lambda R2, R1, *params: Y2_function(R1, R2, *params)/Y1_function(R1, R2, *params)
+          dR1dR2 = lambda R2, R1, *params: s2_function(R1, R2, *params)/s1_function(R1, R2, *params)
 
           # Integrate ODE along R2 axis
           R2_trajectory = numpy.linspace(R2, R2min, num_points)
           solution = integrate.solve_ivp(dR1dR2, (R2, R2min), [R1], t_eval=R2_trajectory, args=params)
           R1_trajectory = solution.y[0]
           R1_trajectory_interpolated = interpolate.interp1d(R2_trajectory, R1_trajectory, kind="cubic")
-          Y2_function_wrapper = lambda R2: Y2_function(R1_trajectory_interpolated(R2), R2, *params)
+          s2_function_wrapper = lambda R2: s2_function(R1_trajectory_interpolated(R2), R2, *params)
 
           # Now integrate intrinsic yield along the resource depletion trajectory to calculate total yield
-          dN = integrate.quad(Y2_function_wrapper, R2min, R2)[0]
+          N = integrate.quad(s2_function_wrapper, R2min, R2)[0]
 
-     return dN
+     return N

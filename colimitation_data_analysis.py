@@ -169,7 +169,7 @@ def FitData(R_values, trait_values, model):
           # for scale of resource concentration
           half_R1_range = 0.5*(max(R_values[0]) + min(R_values[0]))
 
-          # The next parameters are always the trait to resource stoichiometries,
+          # The next parameters are always the trait to resource coefficients,
           # so guess the ratios of the max trait to half resource concentration range
           param_guesses += [max(trait_values)/half_R1_range]
           # For the Hill model, guess a Hill coefficient of 1 (equivalent to Monod)
@@ -186,14 +186,14 @@ def FitData(R_values, trait_values, model):
           half_R1_range = 0.5*(max(R_values[0]) + min(R_values[0]))
           half_R2_range = 0.5*(max(R_values[1]) + min(R_values[1]))
 
-          # The next parameters are always the trait to resource stoichiometries,
+          # The next parameters are always the trait to resource coefficients,
           # so guess the ratios of the max trait to half resource concentration range
           param_guesses += [max(trait_values)/half_R1_range, max(trait_values)/half_R2_range]
           # For the Hill model, guess a Hill coefficient of 1 (equivalent to Monod)
           if "hill" in model:
                param_guesses += [1, 1]
-          # For the generalized-mean model, guess a large q value that makes it Liebig-like
-          if "generalized_mean" in model:
+          # For the generalized-additive model, guess a large q value that makes it Liebig-like
+          if "generalized_additive" in model:
                param_guesses += [colimitation_models.LIEBIG_LIKE_EXPONENT]
           # For rmin models, guess Rmin is zero
           if "rmin" in model:
@@ -203,7 +203,7 @@ def FitData(R_values, trait_values, model):
           raise ValueError("Too many resources for fitting")
 
      # Set all lower bounds to zero, all upper bounds to infinity
-     # Note that for the generalized-mean model of yield, this requires it to be
+     # Note that for the generalized-additive model of yield, this requires it to be
      # parameterized such that q > 0 means essential resources
      num_params = len(param_guesses)
      bounds = (num_params*[0], num_params*[numpy.inf])
@@ -322,10 +322,10 @@ def FitAllModels(R1_mesh, R2_mesh, trait_mesh, reps, list_of_models):
           params, sds, Rsq, aicc = FitData(R1R2_values, trait_values, model)
 
           # Set string of parameter names
-          param_names = "zmax;s1;s2"
+          param_names = "zmax;c1;c2"
           if "hill" in model:
                param_names += ";n1;n2"
-          if "generalized_mean" in model:
+          if "generalized_additive" in model:
                param_names += ";q"
           if "rmin" in model:
                param_names += ";R1min;R2min"
